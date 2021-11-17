@@ -29,7 +29,7 @@ def checkup_res(res):
     # Histogramme
     sns.distplot(res, kde=True, ax=ax5, fit=norm).set(title='KDE plot')
     # QQ plot
-    qqplot(res, line='0', ax=ax6)
+    qqplot(res, line='45', ax=ax6)
     ax6.title.set_text('QQ Plot')
     # Série normalisée
     res_norm = (res.values - res.mean()) / res.std()
