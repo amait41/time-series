@@ -15,7 +15,7 @@ plot(timeSeries, type='l')
 ```
 Données : 287 jours (41 semaines) à partir du 1er janvier 2021
 ```{r}
-timeSeries = ts(data$n_orders[366:(366+287-1)], frequency=7)
+timeSeries = ts(data$n_orders[366:(366+287-1)],start=1, frequency=7)
 plot(timeSeries, type='l')
 ```
 La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox (avec lambda = -0.7, à developper)
@@ -26,7 +26,6 @@ plot(BoxCoxTS)
 ```
 On a réussi à bien réduire la variance.
 ```{r}
-# Fonction permettant une analyse visuelle des résidus d'une modélisation par quelques graphiques adaptés
 checkupRes = function(Res){
   
   # Partitionnement de la fenêtre graphique 
@@ -71,71 +70,33 @@ kpss.test(decomp$random)
 adf.test(decomp$random[which(!is.na(decomp$random))])
 ```
 
-Pas fou, on essaie de differencier
+Même résultat en différenciant
 ```{r}
 BoxCoxTS2 = diff(BoxCoxTS)
-plot(BoxCoxTS2)
-```
-
-```{r}
 decomp = decompose(BoxCoxTS2)
 checkupRes(decomp$random[which(!is.na(decomp$random))])
 Box.test(decomp$random)
 kpss.test(decomp$random)
 adf.test(decomp$random[which(!is.na(decomp$random))])
 ```
-
-Pas fou non plus, on ferait mieux de rester sur la série non différenciée
-
+Proposition d'un premier modèle pour la transformation BoxCox avec lambda=-0.7
 
 ```{r}
 decomp = decompose(BoxCoxTS)
-auto.arima(decomp$random)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+mod1 = auto.arima(decomp$random+decomp$trend, max.p=10,max.q=10)
+mod1
 ```
+Premier candidat : SARIMA (6,0,0)x(1,0,2)[7]
+
+Estimation de la tendance pour BoxCoxTS :
 
 ```{r}
-Box.test(decomp$random)
-kpss.test(decomp$random)
-adf.test(decomp$random[which(!is.na(decomp$random))])
-```
-
-
-
-
-
-On va chercher à prédire les 21 dernières valeurs de la série
-```{r}
-h=21
-trainData = ts(data$n_orders[366:(652-h)],start=1, frequency = 7)
-testData = ts(data$n_orders[(652-h+1):652],start=39, frequency = 7)
-```
-
-
-```{r}
-lambda = -0.7
-BoxCoxTrainData = (trainData^lambda-1)/lambda
-BoxCoxTrainData = ts(BoxCoxTrainData, start=1, frequency = 7)
-plot(BoxCoxTrainData)
-```
-
-```{r}
-library(tseries)
-kpss.test(BoxCoxTrainData)
-adf.test(BoxCoxTrainData)
-```
-
-```{r}
-decomp = decompose(BoxCoxTrainData)
-plot(decomp)
-```
-
-La tendance n'est clairement pas linéaire. On va essayer de la modéliser
-
-```{r}
-tps = 366:(652-h)
+tps = 366:652
 RegLin = lm(formula = decomp$trend ~ tps + I(tps^2) + I(tps^3) + I(tps^4),data = decomp$trend)
 summary(RegLin)
 ```
+
 ```{r}
 simuTrend = fitted(RegLin,tps)
 simuTrend = ts(simuTrend, frequency = 7)
@@ -143,37 +104,47 @@ plot(decomp$trend)
 lines(simuTrend,type='l',col='red')
 ```
 
-Residus
+On va chercher à prédire les 3 dernières périodes de la série
+```{r}
+traintps = 1:266
+testtps = 267:287
+trainData = ts(BoxCoxTS[traintps],start=1, frequency = 7)
+testData = ts(BoxCoxTS[testtps],start=39, frequency = 7)
+```
+
+
+Modèle résidus
+```{r}
+decomp = decompose(trainData)
+mod1 = Arima(decomp$random, order=c(6,0,0), seasonal=list(order=c(1,0,2),period=7))
+mod1
+```
+
+
 
 ```{r}
+PredNoise = forecast(mod1, h=21)
+PredNoise$fitted
+PredTrend = fitted(RegLin,testtps)
 
+#MSE = 1/h*sum(fit-testData)^2;MSE
 ```
 
 ```{r}
-checkupRes(decomp$random[which(!is.na(decomp$random))])
-```
-
-```{r}
-SARIMA = auto.arima(BoxCoxTrainData, xreg = tps + I(tps^2) + I(tps^3) + I(tps^4))
-SARIMA
-```
-
-```{r}
-Box.test(SARIMA$residuals, lag=7)
-checkupRes(SARIMA$residuals)
-```
-
-Residu est bien un bruit blanc
-
-```{r}
-plot(BoxCoxTrainData, type="l")
-lines(fitted(SARIMA), type="l", col="red")
-```
-```{r}
-Pred = forecast(SARIMA,xreg = tps + I(tps^2) + I(tps^3) + I(tps^4), h=h)
-fit = ts(Pred$fitted,start=39, frequency = 7)
 plot(trainData)
-lines(fit, col='red')
-MSE = 1/h*sum(fit-testData)^2;MSE
+```
+
+```{r}
+adf.test(trainData)
+kpss.test(trainData)
+```
+
+```{r}
+mod2 = auto.arima(trainData)
+mod2
+```
+
+```{r}
+pred = forecast(mod2,h=21)
 ```
 
