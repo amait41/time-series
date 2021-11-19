@@ -1,0 +1,20 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(TSA)
+data = read.csv('orders.csv')
+```
+
+```{r}
+data = ts(data$n_orders)
+plot(data)
+```
+
+```{r}
+timeSeries = BoxCox.ar(data)
+```
+
