@@ -10,11 +10,170 @@ data = read.csv('orders.csv')
 ```
 
 ```{r}
-data = ts(data$n_orders)
-plot(data)
+timeSeries = ts(data$n_orders[1:652], frequency=7)
+plot(timeSeries, type='l')
+```
+Données : 287 jours (41 semaines) à partir du 1er janvier 2021
+```{r}
+timeSeries = ts(data$n_orders[366:(366+287-1)], frequency=7)
+plot(timeSeries, type='l')
+```
+La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox (avec lambda = -0.7, à developper)
+
+```{r}
+BoxCoxTS = ts(BoxCox(timeSeries,-0.7), start=1, frequency = 7)
+plot(BoxCoxTS)
+```
+On a réussi à bien réduire la variance.
+```{r}
+# Fonction permettant une analyse visuelle des résidus d'une modélisation par quelques graphiques adaptés
+checkupRes = function(Res){
+  
+  # Partitionnement de la fenêtre graphique 
+  layout(matrix(c(1,1,1,2:7), nrow=3, ncol=3, byrow=TRUE))
+  plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
+  
+  # Série des résidus
+  plot(Res,type='l', xlab = 'Time', ylab = 'Residuals')
+  
+  # ACF/PACF
+  acf(Res)
+  pacf(Res)
+  
+  # Nuage de points avec décalage de 1 dans le temps
+  Res_aux = c()
+  
+  for (j in 1:length(Res)){
+    Res_aux[j] = Res[j-1]
+  }
+  plot(Res_aux,Res,col='blue', xlab = expression(epsilon[t-1]), ylab = expression(epsilon[t]))
+  
+  # Histogramme
+  hist(Res, freq=FALSE, breaks=sqrt(length(Res)),col='lightblue',xlab = 'Residuals')
+  
+  # QQ plots  -> c'est une droite pour les gaussiennes
+  qqnorm(Res,col='blue')
+  qqline(Res)
+  
+  # Nuage de points standardisé
+  plot((Res-mean(Res))/sd(Res),col='blue',ylab = 'Normalized residuals', xlab = 'Time')
+  abline(a=1.96,b=0,col='red')
+  abline(a=-1.96,b=0,col='red')
+}
+```
+
+
+```{r}
+decomp = decompose(BoxCoxTS)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+```
+
+Pas fou, on essaie de differencier
+```{r}
+BoxCoxTS2 = diff(BoxCoxTS)
+plot(BoxCoxTS2)
 ```
 
 ```{r}
-timeSeries = BoxCox.ar(data)
+decomp = decompose(BoxCoxTS2)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+```
+
+Pas fou non plus, on ferait mieux de rester sur la série non différenciée
+
+
+```{r}
+decomp = decompose(BoxCoxTS)
+auto.arima(decomp$random)
+```
+
+```{r}
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+```
+
+
+
+
+
+On va chercher à prédire les 21 dernières valeurs de la série
+```{r}
+h=21
+trainData = ts(data$n_orders[366:(652-h)],start=1, frequency = 7)
+testData = ts(data$n_orders[(652-h+1):652],start=39, frequency = 7)
+```
+
+
+```{r}
+lambda = -0.7
+BoxCoxTrainData = (trainData^lambda-1)/lambda
+BoxCoxTrainData = ts(BoxCoxTrainData, start=1, frequency = 7)
+plot(BoxCoxTrainData)
+```
+
+```{r}
+library(tseries)
+kpss.test(BoxCoxTrainData)
+adf.test(BoxCoxTrainData)
+```
+
+```{r}
+decomp = decompose(BoxCoxTrainData)
+plot(decomp)
+```
+
+La tendance n'est clairement pas linéaire. On va essayer de la modéliser
+
+```{r}
+tps = 366:(652-h)
+RegLin = lm(formula = decomp$trend ~ tps + I(tps^2) + I(tps^3) + I(tps^4),data = decomp$trend)
+summary(RegLin)
+```
+```{r}
+simuTrend = fitted(RegLin,tps)
+simuTrend = ts(simuTrend, frequency = 7)
+plot(decomp$trend)
+lines(simuTrend,type='l',col='red')
+```
+
+Residus
+
+```{r}
+
+```
+
+```{r}
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+```
+
+```{r}
+SARIMA = auto.arima(BoxCoxTrainData, xreg = tps + I(tps^2) + I(tps^3) + I(tps^4))
+SARIMA
+```
+
+```{r}
+Box.test(SARIMA$residuals, lag=7)
+checkupRes(SARIMA$residuals)
+```
+
+Residu est bien un bruit blanc
+
+```{r}
+plot(BoxCoxTrainData, type="l")
+lines(fitted(SARIMA), type="l", col="red")
+```
+```{r}
+Pred = forecast(SARIMA,xreg = tps + I(tps^2) + I(tps^3) + I(tps^4), h=h)
+fit = ts(Pred$fitted,start=39, frequency = 7)
+plot(trainData)
+lines(fit, col='red')
+MSE = 1/h*sum(fit-testData)^2;MSE
 ```
 
