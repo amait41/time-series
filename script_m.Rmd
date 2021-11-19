@@ -84,8 +84,7 @@ Proposition d'un premier modèle pour la transformation BoxCox avec lambda=-0.7
 ```{r}
 decomp = decompose(BoxCoxTS)
 checkupRes(decomp$random[which(!is.na(decomp$random))])
-mod1 = auto.arima(decomp$random+decomp$trend, max.p=10,max.q=10)
-mod1
+auto.arima(decomp$random+decomp$trend, max.p=10,max.q=10)
 ```
 Premier candidat : SARIMA (6,0,0)x(1,0,2)[7]
 
@@ -121,15 +120,6 @@ mod1
 ```
 
 
-
-```{r}
-PredNoise = forecast(mod1, h=21)
-PredNoise$fitted
-PredTrend = fitted(RegLin,testtps)
-
-#MSE = 1/h*sum(fit-testData)^2;MSE
-```
-
 ```{r}
 plot(trainData)
 ```
@@ -145,6 +135,13 @@ mod2
 ```
 
 ```{r}
-pred = forecast(mod2,h=21)
+pred = ts(predict(mod2,n.ahead=21),start=39,frequency = 7)
+
+plot(trainData)
+lines(testData)
+lines(pred$pred,col='red')
+
+MSE = (1/21)*sum((pred$pred-testData)^2)
+MSE
 ```
 
