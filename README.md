@@ -5,10 +5,11 @@ Study of a time series and implementation of SARIMA-type models.
 - Ajouter les moyennes journalières en variable exogènes
 
 # Question
-- Cmment on calcul la (log-)vraissemblance d'un modèle ? => BIC 
+- Comment on calcul la (log-)vraissemblance d'un modèle ? => BIC et AIC score de parcimonie ?
 - Pourquoi on ne fait pas de ACF/PACF pour estimer les paramètre p et q d'un modèle SARIMA ? Quand est-il des paramètre P, Q ?
 - Pas besoin de regression si on met d ou D > 0 ? => d=3 dans un SARIMA alors la tendance d'ordre 2 est éliminée ?
-- bIC 
+- Que veut dire /!\ p.48 ?
+- Est-ce que un modèle créé à partir de la méthode de Box-Jenkins est très différant d'un modèle obtenu par auto.arima (avec espace de rechereche large) ?
 
 # Modèles
 
