@@ -27,9 +27,9 @@ def checkup_res(res):
     # Lag
     sns.scatterplot(x=res.values[:-1], y=res.values[1:], ax=ax4).set(xlabel=r'$\epsilon_{t-1}$', ylabel=r'$\epsilon_t$', title='Lag 1')
     # Histogramme
-    sns.distplot(res, kde=True, ax=ax5, fit=norm).set(title='KDE plot')
+    sns.distplot(res / res.std(), kde=True, ax=ax5, fit=norm).set(title='Standardized residuals KDE plot')
     # QQ plot
-    qqplot(res, line='45', ax=ax6)
+    qqplot(res / res.std(), line='45', ax=ax6)
     ax6.title.set_text('QQ Plot')
     # Série normalisée
     res_norm = (res.values - res.mean()) / res.std()
