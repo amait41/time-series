@@ -1,6 +1,8 @@
 # time-series
 Study of a time series and implementation of SARIMA-type models.
 
+# Idées
+- Ajouter les moyennes journalières en variable exogènes
 # Modèles
 
 1. Decompose
