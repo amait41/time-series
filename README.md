@@ -10,7 +10,7 @@ Study of a time series and implementation of SARIMA-type models.
   Car losqu'on a un pic, il n'est pas évident de savoir si il doit être traité par un paramètre "ARMA" ou "saisonnier" ?
 - Pas besoin de regression si on met d ou D > 0 ? => d=3 dans un SARIMA alors la tendance d'ordre 2 est éliminée ?
   Soit on traite la saisonalité avec decompose soit avec un SARIMA
-- Que veut dire "oublier une tendance avec différanciation" p.48 ?
+- Que veut dire "oublier une tendance avec différenciation" p.48 ?
 - Est-ce que un modèle créé à partir de la méthode de Box-Jenkins est très différant d'un modèle obtenu par auto.arima (avec espace de rechereche large) ? cf. p.48
 - Autres méthodes pour traiter les ruptures de tendance / variance ?
 
@@ -20,9 +20,10 @@ Study of a time series and implementation of SARIMA-type models.
 2. SARIMA
 3. Log + SARIMA
 4. Box-Cox + SARIMA => procédure choix du lambda (idem en R et Python = -0.7)
+5. GARCH
 
 # Étapes
-1. Différancier + transfo + reg pour être stationnare
+1. Différencier + transfo + reg pour être stationnare
 2. Bloquer d et D puis faire auto.arima => 
 3. check res + test normalité (shapiro et autres) + test Ljung-Box
 4. pred avec CV
