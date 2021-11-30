@@ -9,18 +9,18 @@ library(TSA)
 library(forecast)
 library(tseries)
 data = read.csv('orders.csv')
-source('../CheckUpRes.R')
+source('CheckUpRes.R')
 ```
 
 Données : 308 jours (44 semaines) à partir du 4 janvier 2021
 ```{r}
-timeSeries = ts(data$y, frequency=7)
+timeSeries = ts(data$n_orders, frequency=7)
 plot(timeSeries, type='l')
 ```
 Données d'entrainement
 ```{r}
-timeSeriesTest = ts(data$y[281:308], start = 41, frequency=7)
-timeSeries = ts(data$y[1:280], frequency=7)
+timeSeriesTest = ts(data$n_orders[281:308], start = 41, frequency=7)
+timeSeries = ts(data$n_orders[1:280], frequency=7)
 plot(timeSeries, type='l')
 ```
 
@@ -133,7 +133,7 @@ Erreur finale
 ```{r}
 pred = forecast(mod1,h=28)
 
-pred_val = exp(pred1$mean + mod1$sigma2)
+pred_val = exp(pred$mean + mod1$sigma2)
 MAPE = 100/28*sum(abs((pred_val-timeSeriesTest))/pred_val)
 MAPE
 
