@@ -1,0 +1,152 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(TSA)
+library(tseries)
+library(forecast)
+data = read.csv('orders.csv')
+data
+```
+
+```{r}
+timeSeries = ts(data$n_orders[1:308], frequency=7)
+plot(timeSeries, type='l')
+```
+La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox (avec lambda = -0.7)
+
+```{r}
+BoxCoxTS = ts(BoxCox(timeSeries,-0.7), start=1, frequency = 7)
+plot(BoxCoxTS)
+```
+On a réussi à bien réduire la variance.
+```{r}
+checkupRes = function(Res){
+  
+  # Partitionnement de la fenêtre graphique 
+  layout(matrix(c(1,1,1,2:7), nrow=3, ncol=3, byrow=TRUE))
+  plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
+  
+  # Série des résidus
+  plot(Res,type='l', xlab = 'Time', ylab = 'Residuals')
+  
+  # ACF/PACF
+  acf(Res)
+  pacf(Res)
+  
+  # Nuage de points avec décalage de 1 dans le temps
+  Res_aux = c()
+  
+  for (j in 1:length(Res)){
+    Res_aux[j] = Res[j-1]
+  }
+  plot(Res_aux,Res,col='blue', xlab = expression(epsilon[t-1]), ylab = expression(epsilon[t]))
+  
+  # Histogramme
+  hist(Res, freq=FALSE, breaks=sqrt(length(Res)),col='lightblue',xlab = 'Residuals')
+  
+  # QQ plots  -> c'est une droite pour les gaussiennes
+  qqnorm(Res,col='blue')
+  qqline(Res)
+  
+  # Nuage de points standardisé
+  plot((Res-mean(Res))/sd(Res),col='blue',ylab = 'Normalized residuals', xlab = 'Time')
+  abline(a=1.96,b=0,col='red')
+  abline(a=-1.96,b=0,col='red')
+}
+```
+
+
+```{r}
+decomp = decompose(BoxCoxTS)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+```
+
+Même résultat en différenciant
+```{r}
+BoxCoxTS2 = diff(BoxCoxTS)
+decomp = decompose(BoxCoxTS2)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+```
+Proposition d'un premier modèle pour la transformation BoxCox avec lambda=-0.7
+
+```{r}
+decomp = decompose(BoxCoxTS)
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+auto.arima(decomp$random+decomp$trend, max.p=10,max.q=10)
+```
+Premier candidat : SARIMA (6,0,0)x(1,0,2)[7]
+
+Estimation de la tendance pour BoxCoxTS :
+
+```{r}
+tps = 366:652
+RegLin = lm(formula = decomp$trend ~ tps + I(tps^2) + I(tps^3) + I(tps^4),data = decomp$trend)
+summary(RegLin)
+```
+
+```{r}
+simuTrend = fitted(RegLin,tps)
+simuTrend = ts(simuTrend, frequency = 7)
+plot(decomp$trend)
+lines(simuTrend,type='l',col='red')
+```
+
+On va chercher à prédire les 3 dernières périodes de la série
+```{r}
+traintps = 1:266
+testtps = 267:287
+trainData = ts(BoxCoxTS[traintps],start=1, frequency = 7)
+testData = ts(BoxCoxTS[testtps],start=39, frequency = 7)
+```
+
+
+Modèle résidus
+```{r}
+decomp = decompose(trainData)
+mod1 = Arima(decomp$random, order=c(6,0,0), seasonal=list(order=c(1,0,2),period=7))
+mod1
+```
+
+
+```{r}
+plot(trainData)
+```
+
+```{r}
+adf.test(trainData)
+kpss.test(trainData)
+```
+
+```{r}
+mod2 = auto.arima(trainData)
+mod2
+```
+
+```{r}
+pred = ts(predict(mod2,n.ahead=21),start=39,frequency = 7)
+
+plot(trainData)
+lines(testData)
+lines(pred$pred,col='red')
+
+MSE = (1/21)*sum((pred$pred-testData)^2)
+MSE
+```
+
+```{r}
+trainTime = 1:280
+testTime = 281:308
+mod = auto.arima(timeSeries[trainTime])
+summary(mod)
+```
+
