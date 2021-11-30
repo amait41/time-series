@@ -32,3 +32,11 @@ checkupRes = function(Res){
   abline(a=1.96,b=0,col='red')
   abline(a=-1.96,b=0,col='red')
 }
+
+check_stat = function(res){
+  checkupRes(res[which(!is.na(res))])
+  print(Box.test(res, type="Ljung-Box", lag=7))
+  print(kpss.test(res))
+  print(adf.test(res[which(!is.na(res))]))
+  print(shapiro.test(res))
+}

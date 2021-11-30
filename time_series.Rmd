@@ -6,6 +6,7 @@ output: html_notebook
 library(TSA)
 library(tseries)
 library(forecast)
+source(file = "checkup_res.R")
 ```
 
 # Introduction
@@ -47,8 +48,6 @@ Box.test(trainset, type="Ljung-Box", lag=7)
 adf.test(trainset)
 kpss.test(trainset)
 McLeod.Li.test(y=trainset)
-#help(McLeod.Li.test)
-#help(Box.test)
 ```
 Analysons le résultats des tests.
 
@@ -79,18 +78,28 @@ La fonction `decompose` détermine d'abord la composante de tendance en utilisan
 Analysons à présent les résidus.
 
 ```{r}
-plot(decomp$random)
-
+checkupRes(decomp$random[which(!is.na(decomp$random))])
+Box.test(decomp$random, type="Ljung-Box", lag=7)
+Box.test(decomp$random)
+kpss.test(decomp$random)
+adf.test(decomp$random[which(!is.na(decomp$random))])
+shapiro.test(decomp$random)
 ```
+Les résidus ne sont toujours pas stationnaires visuellment car on distingue une périodicité. L'ACF conforme cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), ils ne semblent pas suivre une loi gausienne.
+
+Cette méthode nécéssite un traitement sur ses résidus.
 
 ```{r}
-decompose = decompose(trainset)
-checkupRes(decompose$random[which(!is.na(decomp$random))])
-Box.test(decompose$random)
-kpss.test(decompose$random)
-#adf.test(decompose$random[which(!is.na(decomp$random))])
-adf.test(decompose$random)
+diff7 = diff(trainset, 7)
+decomp7 = decompose(diff7, type="multiplicative")
+plot(decomp7)
 ```
+```{r}
+check_stat(decomp7$random)
+```
+Avec un différentiation d'ordre 7 et une décomposition on obtient un bruit banc non-gausien.
+
+Testons à présent des différantiation.
 
 ## Différentiation
 
