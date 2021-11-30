@@ -33,7 +33,7 @@ t3 = 247:280; X3 = trainset[t3]
 lm1 = lm(X1~t1)
 lm2 = lm(X2~t2)
 lm3 = lm(X3~t3)
-plot(1:length(trainset), trainset, type='l', xlab="Nb. de période", ylab="# commandes")
+plot(1:length(trainset), trainset, type='l', xlab="Période", ylab="Commandes")
 lines(t2, X2, type="l", col="blue")
 lines(t3, X3, type="l", col="red")
 lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
@@ -68,9 +68,28 @@ Dans la partie suivante, nous allons implémenter plusieurs approches afin de re
 
 ## Decompose
 
-La fonction `decompose` truc.
-```{r}
+La fonction `decompose` renvoie une tendance, une composante saisonnière ainsi que des résidus. 
 
+```{r}
+decomp = decompose(trainset)
+plot(decomp)
+```
+La fonction `decompose` détermine d'abord la composante de tendance en utilisant une moyenne mobile, et la supprime de la série chronologique. Ensuite, la figure saisonnière est calculée en faisant la moyenne, pour chaque unité de temps, de toutes les périodes. La figure saisonnière est ensuite centrée. Enfin, la composante d'erreur est déterminée en retirant la tendance et la figure saisonnière (dupliquée si nécessaire) de la série temporelle originale.
+
+Analysons à présent les résidus.
+
+```{r}
+plot(decomp$random)
+
+```
+
+```{r}
+decompose = decompose(trainset)
+checkupRes(decompose$random[which(!is.na(decomp$random))])
+Box.test(decompose$random)
+kpss.test(decompose$random)
+#adf.test(decompose$random[which(!is.na(decomp$random))])
+adf.test(decompose$random)
 ```
 
 ## Différentiation
