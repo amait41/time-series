@@ -1,0 +1,80 @@
+---
+title: "Série Chronologique - Projet"
+output: html_notebook
+---
+```{r}
+library(TSA)
+library(tseries)
+library(forecast)
+```
+
+# Introduction
+
+=> Intro sur les séries temporelles
+
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise angevine de livraison de repas à domicile, Frères Toque. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+
+```{r}
+data = read.csv('orders.csv')
+trainset = ts(data$n_orders[1:280], frequency=7)
+testset = ts(data$n_orders[281:328], frequency=7)
+plot(trainset, type='l')
+```
+Cette série présente plusieurs caractéristiques remarquables.
+
+Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre de commandes croit du dimanche au vendredi puis décroît le samedi en moyenne.
+
+La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonalité marquée et une variance qui augmante.
+
+```{r}
+t1 = 1:126; X1 = trainset[t1]
+t2 = 127:246; X2 = trainset[t2]
+t3 = 247:280; X3 = trainset[t3]
+lm1 = lm(X1~t1)
+lm2 = lm(X2~t2)
+lm3 = lm(X3~t3)
+plot(1:length(trainset), trainset, type='l', xlab="Nb. de période", ylab="# commandes")
+lines(t2, X2, type="l", col="blue")
+lines(t3, X3, type="l", col="red")
+lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
+lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
+lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
+```
+```{r}
+acf(trainset, lag.max = 50)
+pacf(trainset, lag.max = 50)
+Box.test(trainset, type="Ljung-Box", lag=7)
+adf.test(trainset)
+kpss.test(trainset)
+McLeod.Li.test(y=trainset)
+#help(McLeod.Li.test)
+#help(Box.test)
+```
+Analysons le résultats des tests.
+
+L'AFC présente des pics périodiques significatifs majoritairement. On ne peut donc pas conclure que la série est stationnaire car elle possède une composante saisonnière.
+
+La PACF possède des corrélations partielles significatives des lags 1 et 3 à 7 ainsi qu'au lag 14. Ainsi, on en conclut que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
+
+Les tests ADF et KPSS s'accorde aboutisse à la même conclusion : la série est stationnaire.
+
+Le test McLoed.Li nous pousse à conclure qu'il n'y a pas d'heteroscédasticité au sein de la série.
+
+En conclusion, la série n'est pas stationnaire car présente une saisonalité d'ordre 7. Malgré l'avis contraire des tests, il peut être intéressant d'appliquer des transformations pour atténuer les différences de variance au cours du temps.
+
+Dans la partie suivante, nous allons implémenter plusieurs approches afin de rendre la série stationnaire. Premièrement, nous appliquerons un modèle simple, la décomposation. Puis dans un second et troisième temps, nous testerons des méthodes de différenciation et de régression.
+
+# Stationarité
+
+## Decompose
+
+La fonction `decompose` truc.
+```{r}
+
+```
+
+## Différentiation
+
+## Régression d'ordre 3
+
+## Conclusion
