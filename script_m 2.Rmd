@@ -1,0 +1,106 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r,warning=FALSE}
+library(TSA)
+library(forecast)
+library(tseries)
+data = read.csv('orders.csv')
+source('CheckUpRes.R')
+```
+
+Données : 308 jours (44 semaines) à partir du 4 janvier 2021
+```{r}
+timeSeries = ts(data$n_orders, frequency=7)
+plot(timeSeries, type='l')
+```
+
+Données d'entrainement
+```{r}
+timeSeriesTest = ts(data$n_orders[281:308], start = 41, frequency=7)
+timeSeries = ts(data$n_orders[1:280], frequency=7)
+plot(timeSeries, type='l')
+```
+
+
+
+```{r}
+kpss.test(timeSeries)
+adf.test(timeSeries)
+```
+Pas stationnaire
+
+```{r}
+acf(as.numeric(timeSeries), lag.max=40)
+pacf(as.numeric(timeSeries), lag.max=40)
+```
+
+Differenciation I-B⁷
+```{r}
+timeSeries2 = diff(timeSeries,7)
+plot(timeSeries2)
+```
+
+```{r}
+kpss.test(timeSeries2)
+adf.test(timeSeries2)
+```
+Les tests vont dans le sens de la stationnarité
+
+```{r}
+acf(as.numeric(timeSeries2), lag.max=40)
+pacf(as.numeric(timeSeries2), lag.max=40)
+```
+ACF : décroissance rapide avec un pic à 7
+PACF : 
+
+
+Differenciation (I-B)(I-B⁷)
+```{r}
+timeSeries3 = diff(diff(timeSeries,7))
+plot(timeSeries3)
+```
+
+```{r}
+kpss.test(timeSeries3)
+adf.test(timeSeries3)
+```
+Les tests vont dans le sens de la stationnarité
+
+```{r}
+acf(as.numeric(timeSeries3), lag.max=40)
+pacf(as.numeric(timeSeries3), lag.max=40)
+```
+
+
+Conclusion : Il est judicieux de garder la série timeSeries3 dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur cette série.
+
+Premier modèle :
+
+
+```{r}
+mod1 = auto.arima(timeSeries,allowmean = TRUE, max.D = 1, max.d = 1, allowdrift = TRUE)
+mod1
+```
+
+```{r}
+plot(timeSeries)
+lines(mod1$fitted,col='red')
+```
+
+
+Erreur finale
+```{r}
+pred = forecast(mod1,h=28)
+
+pred_val = pred$mean
+MAPE = 100/28*sum(abs((pred_val-timeSeriesTest))/pred_val)
+MAPE
+
+plot(pred)
+```
+
+
+
