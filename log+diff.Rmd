@@ -61,7 +61,7 @@ acf(as.numeric(DBoxCoxTS1), lag.max=40)
 pacf(as.numeric(DBoxCoxTS1), lag.max=40)
 ```
 Mais pas l'ACF où un motif périodique se dessine clairement.
-On voit néanmois qu'on a réussi à éliminer la tendance
+On voit néanmois qu'on a réussi à éliminer la tendance.
 
 
 Differenciation I-B⁷
