@@ -85,9 +85,11 @@ kpss.test(decomp$random)
 adf.test(decomp$random[which(!is.na(decomp$random))])
 shapiro.test(decomp$random)
 ```
-Les résidus ne sont toujours pas stationnaires visuellment car on distingue une périodicité. L'ACF conforme cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), ils ne semblent pas suivre une loi gausienne.
+Les résidus ne sont toujours pas stationnaires visuellment car on distingue une périodicité. L'ACF conforme cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), les résidus ne semblent pas suivre une loi gausienne.
 
-Cette méthode nécéssite un traitement sur ses résidus.
+Cette méthode nécéssite un traitement sur ses résidus. Testons à présent des différentiations.
+
+## Différentiation
 
 ```{r}
 diff7 = diff(trainset, 7)
@@ -99,7 +101,7 @@ check_stat(decomp7$random)
 ```
 Avec un différentiation d'ordre 7 et une décomposition on obtient un bruit banc non-gausien.
 
-Testons à présent des différantiation.
+
 
 ## Différentiation
 
