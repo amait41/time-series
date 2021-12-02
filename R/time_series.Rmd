@@ -1,0 +1,311 @@
+---
+title: "Série Chronologique - Projet"
+output:
+  html_notebook: 
+    toc: yes
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r}
+library(TSA)
+library(tseries)
+library(forecast)
+source(file = "functions.R")
+```
+
+# Introduction
+
+=> Intro sur les séries temporelles
+
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise angevine de livraison de repas à domicile, Frères Toque. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+
+```{r}
+data = read.csv('orders.csv')
+trainset = ts(data$n_orders[1:280], frequency=7)
+testset = ts(data$n_orders[281:328], frequency=7)
+plot(trainset, type='l')
+```
+Cette série présente plusieurs caractéristiques remarquables.
+
+Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre de commandes croit du dimanche au vendredi puis décroît le samedi en moyenne.
+
+La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
+
+```{r}
+t1 = 1:126; X1 = trainset[t1]
+t2 = 127:246; X2 = trainset[t2]
+t3 = 247:280; X3 = trainset[t3]
+lm1 = lm(X1~t1)
+lm2 = lm(X2~t2)
+lm3 = lm(X3~t3)
+plot(1:length(trainset), trainset, type='l', xlab="Période", ylab="Commandes")
+lines(t2, X2, type="l", col="blue")
+lines(t3, X3, type="l", col="red")
+lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
+lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
+lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
+```
+```{r}
+acf(trainset, lag.max = 50)
+pacf(trainset, lag.max = 50)
+Box.test(trainset, type="Ljung-Box", lag=7)
+adf.test(trainset)
+kpss.test(trainset)
+McLeod.Li.test(y=trainset)
+```
+Analysons le résultats des tests (voir présentation des tests en Annexe 1 si besoin).
+
+L'ACF présente des pics périodiques significatifs majoritairement. On ne peut donc pas conclure que la série est stationnaire car elle possède une composante saisonnière.
+
+La PACF possède des corrélations partielles significatives des lags 1 et 3 à 7 ainsi qu'au lag 14. Ainsi, on en conclut que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
+
+Les tests ADF et KPSS s'accordent sur la même conclusion : la série est stationnaire. Cependant on voit bien que la variance ne reste pas constante, ce que les tests ADF et KPSS ne détectent pas.
+
+Le test McLoed.Li nous pousse à conclure qu'il n'y a pas d'heteroscédasticité au sein de la série.
+
+En conclusion, la série n'est pas stationnaire car elle présente une saisonalité d'ordre 7 et une variance qui évolue au fil du temps. Il peut être intéressant d'appliquer des transformations pour atténuer les variations de cette dernière.
+
+Dans la partie suivante, nous allons implémenter plusieurs approches afin de rendre la série stationnaire (au second ordre). 
+
+> Une série chronologique est *stationnaire* (du second ordre) si sa moyenne et sa covariance sont invariantes par translation dans le temps.
+
+Ainsi, nous appliquerons dans un premier temps un modèle simple, la décomposition. Puis dans un second et troisième temps, nous testerons des méthodes de différenciation et de régression.
+
+# Stationarité
+
+## Decompose
+
+La fonction `decompose` renvoie une tendance, une composante saisonnière ainsi que des résidus. 
+
+```{r}
+decomp = decompose(trainset)
+plot(decomp)
+```
+
+La fonction `decompose` détermine d'abord la composante de tendance en utilisant une moyenne mobile, et la supprime de la série chronologique. Ici, on voit que l'on pourrait l'approximer par une tendance d'ordre 3. Ensuite, la figure saisonnière est calculée en faisant la moyenne, pour chaque unité de temps, de toutes les périodes. La figure saisonnière est ensuite centrée. Enfin, la composante d'erreur est déterminée en retirant la tendance et la figure saisonnière (dupliquée si nécessaire) de la série temporelle originale.
+
+Analysons à présent les résidus.
+
+```{r}
+check_stat(decomp$random)
+```
+Les résidus ne sont toujours pas stationnaires, ce dont on peut se rendre compte visuellement car on distingue une périodicité. L'ACF conforte cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), les résidus ne semblent pas suivre une loi gaussienne.
+
+## Différenciation sur la série sans transformation
+
+Soit une série temporelle avec $n$ observations. Différencier cette série à l'ordre $d$ consiste à lui appliquer le filtre $(I-B^d)$. On regarde alors si $\Delta X_t = (I-B^d)X_t$ est stationnaire.
+
+```{r}
+diff1 = diff(trainset)
+check_stat((diff1))
+```
+Les tests KPSS et ADF obtiennent des p-value respective supérieur à 0.1 et inférieur à 0.01. On pourrait alors penser que cette série est stationnaire. Néanmoins cette différenciation n'est pas concluante car:
+- On observe une saisonalité de la série graphiquement
+- L'ACF montre aussi un saisonalité avec des pics très significatifs en 7, 14 et 21.
+- La PACF montre des pics de plus en plus significatifs jusqu'à 7.
+- Le graphique des obsrvations $X_t$ en fonction de $X_t-1$ montre visuellement une 
+- Enfin, l'histogramme, le Q-Q plot, le graphique des residus normalisés ainsi que le test de shapiro donne la série non gaussienne.
+
+Passons alors à une différentiation d'ordre 7.
+
+```{r}
+diff2 = diff(trainset, 7)
+check_stat(diff2)
+```
+Les tests ADF et KPPSS vont dans le sens de la stationnarité. L'ACF montre une décroissance rapide avec une légère périodicité et des pics significatifs en 4 et 7. La PACF possède des pics significatifs en 4, 7, 8 et 11 avec une légère périodicité.
+On retrouve une série dont l'allure est en accord avec la stationnarité. Néanmoins les graphiques et les tests montre que cette différanciation ne donne pas une série probablement gausienne.
+
+Essayons de différencier à nouveau la série, c'est à dire d'appliquer le filtre $(I-B)(I-B^7)$ à $X_t$.
+
+```{r}
+diff3 = diff(diff(trainset,7))
+check_stat(diff3)
+```
+
+Les tests vont dans le sens de la stationnarité. L'ACF et la PACF donnent de moins bon résultat dans le sens où il y a respectivement au moins 6 pics significatifs dont certains aù delà de 10. La série ne semble toujours suivre une loi gaussienne.
+
+Conclusion : Les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ semblent rendre la série stationnaire. Il est temps de construire les premiers modèles.
+
+# Modélisation
+
+Les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplissent le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)\times(P,D,Q)_s$.
+
+=> Définition du modèle à développper.
+
+En pratique, on détermine les coefficients avec la méthode auto.arima
+
+```{r}
+model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE)
+model1
+```
+Tous les termes sont significatifs. On obtient un score BIC de 1796.31.
+
+```{r}
+plot(trainset)
+lines(mod1$fitted, col='red')
+```
+Visuellement, le modèle s'adapte relativement bien aux données. Analysons les résidus de ce premier modèle.
+
+```{r}
+check_stat(mod1$residuals)
+```
+#### Conclusion des tests
+Stat
+Box-Ljung : bb au risque de 5%
+KPSS : pas non-stationnaire
+ADF : stationnaire
+Plot : ras
+ACF : pas de pics significatifs
+PACF : pas de pics significatifs
+Lag 1 : indpt
+
+Normalité
+Shapiro : pas gaussien
+Histogramme : pas gaussien
+Q-Q plot : pas gaussien
+
+Passons en analyse du deuxième modèle.
+
+```{r}
+mod2 = auto.arima(trainset,allowmean = TRUE, D = 1, d = 1, allowdrift = TRUE)
+mod2
+```
+Tous les termes sauf sar1 sont significatifs, il serait donc judicieux de "retrograder" notre modèle :
+
+```{r}
+mod2 = Arima(trainset,order = c(2,1,3), seasonal = list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE)
+mod2
+```
+Encore une fois, on a un terme non significatif (ar2), on va encore rétrograder notre modèle
+
+```{r}
+mod2 = Arima(trainset,order = c(1,1,3), seasonal = list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE)
+mod2
+```
+Cette troisième tentative semble meilleure du point de vue du BIC et équivalente du point de vue de l'AIC
+
+```{r}
+plot(trainset)
+lines(mod2$fitted,col='red')
+```
+Analyse des résidus du modèle
+```{r}
+check_stat(mod2$residuals)
+```
+
+
+On a constaté que notre série présente une variance très variable au cours du temps, on peut tenter de corriger ce problème par une transformation logarithmique
+
+
+
+## Transformation logarithmique et différenciation
+
+```{r}
+LogTS = ts(log(trainset), start=1, frequency = 7)
+plot(LogTS)
+```
+On a réussi à bien réduire la variance. Voyons ce que disent les tests ADF et KPSS.
+
+```{r}
+kpss.test(LogTS)
+adf.test(LogTS)
+```
+Les tests vont dans le sens de la non-stationnarité, ce qui est confirmé par l'analyse visuelle.
+
+```{r}
+acf(as.numeric(LogTS), lag.max=40)
+pacf(as.numeric(LogTS), lag.max=40)
+```
+On retrouve dans l'ACF un fort motif périodique
+
+Differenciation I-B
+```{r}
+DLogTS1 = diff(LogTS)
+plot(DLogTS1)
+```
+```{r}
+kpss.test(DLogTS1)
+adf.test(DLogTS1)
+```
+Les tests vont dans le sens de la stationnarité
+
+```{r}
+acf(as.numeric(DLogTS1), lag.max=40)
+pacf(as.numeric(DLogTS1), lag.max=40)
+```
+Mais pas l'ACF où un motif périodique se dessine clairement.
+On voit néanmois qu'on a réussi à éliminer la tendance. 
+Pour éliminer le motif périodique, essayons une différenciation d'ordre 7
+
+
+Differenciation I-B⁷
+```{r}
+DLogTS2 = diff(LogTS,7)
+plot(DLogTS2)
+```
+
+```{r}
+kpss.test(DLogTS2)
+adf.test(DLogTS2)
+```
+Les tests vont dans le sens de la stationnarité
+
+```{r}
+acf(as.numeric(DLogTS2), lag.max=40)
+pacf(as.numeric(DLogTS2), lag.max=40)
+```
+ACF : décroissance rapide avec un pic à 7
+PACF : 
+
+
+Differenciation (I-B)(I-B⁷)
+```{r}
+DLogTS3 = diff(diff(LogTS,7))
+plot(DLogTS3)
+```
+
+```{r}
+kpss.test(DLogTS3)
+adf.test(DLogTS3)
+```
+Les tests vont dans le sens de la stationnarité
+
+```{r}
+acf(as.numeric(DLogTS3), lag.max=40)
+pacf(as.numeric(DLogTS3), lag.max=40)
+```
+
+
+Conclusion : Il est judicieux de considérer les séries DLogTS2 et DLogTS dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries.
+
+
+```{r}
+mod3 = auto.arima(LogTS, allowmean=TRUE, max.D=1, max.d=0, allowdrift=TRUE)
+mod3
+```
+Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle
+
+```{r}
+plot(LogTS)
+lines(mod3$fitted,col='red')
+```
+Analyse des résidus du modèle
+```{r}
+check_stat(mod3$residuals)
+```
+
+
+Deuxième modèle
+```{r}
+mod4 = auto.arima(LogTS,allowmean = TRUE, max.D = 1, max.d = 1, allowdrift = TRUE)
+mod4
+```
+C'est le même modèle !
+
+
+## Transformation BoxCox et différenciation
+
+## Régression d'ordre 3
+
+## Conclusion
