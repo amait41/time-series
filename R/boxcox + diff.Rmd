@@ -26,10 +26,18 @@ plot(timeSeries, type='l')
 
 
 
-La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox (avec lambda = -0.7, à developper)
+La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox
 
 ```{r}
-BoxCoxTS = ts(BoxCox(timeSeries,-0.7), start=1, frequency = 7)
+lambd = BoxCox.lambda(timeSeries)
+```
+
+-1 : 8.9% (BoxCox.lambda(timeSeries))
+-0.3 : 9.54%
+-0.7 : 8.9%
+
+```{r}
+BoxCoxTS = ts(BoxCox(timeSeries,lambd), start=1, frequency = 7)
 plot(BoxCoxTS)
 ```
 On a réussi à bien réduire la variance.
@@ -134,20 +142,15 @@ mod2 = auto.arima(BoxCoxTS,allowmean = TRUE, max.D = 1, max.d = 1, allowdrift = 
 mod2
 ```
 C'est le même modèle !
-Les coefficients sar et sma ne sont pas significatifs, on peut tenter de rétrograder notre modèle
+Le coefficient sma1 n'est pas significatif mais sma2 l'est, donc on ne rétrograde pas notre modèle
 
-```{r}
-mod = Arima(BoxCoxTS, order = c(1,0,1), seasonal = list(order=c(0,1,0), period=7))
-mod
-```
-Néanmoins on voit que celui-ci est moins bon au sens de l'AIC et du BIC, on va donc plutôt garder le modèle complet
 
 Erreur finale
 ```{r}
 library(bimixt)
 pred = forecast(mod1,h=28)
 
-pred_val = boxcox.inv(pred$mean,-0.7)
+pred_val = boxcox.inv(pred$mean,lambd)
 MAPE = 100/28*sum(abs((pred_val-timeSeriesTest))/pred_val)
 MAPE
 
