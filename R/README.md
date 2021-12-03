@@ -17,9 +17,9 @@ Study of a time series and implementation of SARIMA-type models.
 # Modèles
 
 1. Decompose
-2. SARIMA
-3. Log + SARIMA
-4. Box-Cox + SARIMA => procédure choix du lambda (idem en R et Python = -0.7)
+2. SARIMA (MAPE : 10.5%)
+3. Log + SARIMA (MAPE : 9.5%)
+4. Box-Cox + SARIMA => procédure choix du lambda (en R : -1 ou -0.7 selon la méthode mais conduit aux mêmes performances) (MAPE : 8.9%)
 5. GARCH
 
 # Étapes
