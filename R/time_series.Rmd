@@ -11,7 +11,6 @@ output:
 library(TSA)
 library(tseries)
 library(forecast)
-library(tsibble)
 source(file = "functions.R")
 ```
 
@@ -75,7 +74,7 @@ Ainsi, nous appliquerons dans un premier temps un modèle simple, la décomposit
 
 # Stationarité
 
-## Decompose
+## Decomposition
 
 La fonction `decompose` renvoie une tendance, une composante saisonnière ainsi que des résidus. 
 
@@ -86,6 +85,57 @@ plot(decomp)
 
 La fonction `decompose` détermine d'abord la composante de tendance en utilisant une moyenne mobile, et la supprime de la série chronologique. Ici, on voit que l'on pourrait l'approximer par une tendance d'ordre 3. Ensuite, la figure saisonnière est calculée en faisant la moyenne, pour chaque unité de temps, de toutes les périodes. La figure saisonnière est ensuite centrée. Enfin, la composante d'erreur est déterminée en retirant la tendance et la figure saisonnière (dupliquée si nécessaire) de la série temporelle originale.
 
+Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une regression linéaire sur la tendance puis y ajouter composante saisonnière.
+
+```{r}
+t = 1:length(decomp$trend)
+t2 = t^2
+t3 = t^3
+t4 = t^4
+reg_lin1 = lm(decomp$trend ~ t)
+reg_lin2 = lm(decomp$trend ~ t + t2)
+reg_lin3 = lm(decomp$trend ~ t + t2 + t3)
+reg_lin4 = lm(decomp$trend ~ t + t2 + t3 + t4)
+summary(reg_lin1)
+summary(reg_lin2)
+summary(reg_lin3)
+summary(reg_lin4)
+
+plot(t, as.numeric(decomp$trend), type="l")
+lines(reg_lin1$fitted.values, type="l")
+lines(reg_lin2$fitted.values, type="l", col="blue")
+lines(reg_lin3$fitted.values, type="l", col="red")
+lines(reg_lin4$fitted.values, type="l", col="green")
+```
+
+Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat et obtienent un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garde la régression linéaire d'ordre 3.
+
+```{r}
+pred_decomp = function(trainset, testset){
+  n1 = length(trainset)
+  n2 = length(testset)
+  decomp = decompose(trainset)
+  t = 1:n1
+  t2 = t**2
+  t3 = t**3
+  reg_lin = lm(decomp$trend ~ t + t2 + t3)
+  x = (n1 + 1) : (n1 + n2)
+  x2 = x**2
+  x3 = x**3
+  trend = reg_lin$coefficients[1] + x * reg_lin$coefficients[2] + x2 * reg_lin$coefficients[3] + x3 * reg_lin$coefficients[4]
+  if (n2%%7==0){
+    print("ok")
+    seasons = c(rep(decomp$figure, n2%/%7))
+  }else{
+    print(n2)
+    print(n2%/%7)
+    seasons = c(rep(decomp$figure, n2%/%7), decomp$figure[1:n2%%7])
+  }
+  trend + seasons
+}
+
+plot(pred_decomp(trainset, testset), type="l", ylab="Prédiction")
+```
 Analysons à présent les résidus.
 
 ```{r}
@@ -93,9 +143,20 @@ check_stat(decomp$random)
 ```
 Les résidus ne sont toujours pas stationnaires, ce dont on peut se rendre compte visuellement car on distingue une périodicité. L'ACF conforte cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), les résidus ne semblent pas suivre une loi gaussienne.
 
-## Différenciation sur la série sans transformation
+Un modèle ARMA ne peut être appliqué car la série n'est pas stationnaire. La technique privilégier est la différenciation. Nous expliquons et appliquons cette technique dans la partie suivante.
+
+## Différenciation
 
 Soit une série temporelle avec $n$ observations. Différencier cette série à l'ordre $d$ consiste à lui appliquer le filtre $(I-B^d)$. On regarde alors si $\Delta X_t = (I-B^d)X_t$ est stationnaire.
+
+### Différenciation sur les résidus de la décomposition
+
+```{r}
+diff_decompose = diff(diff(decomp$random, 7))
+check_stat(diff_decompose)
+```
+
+### Différenciation sur la série original
 
 ```{r}
 diff1 = diff(trainset)
@@ -128,13 +189,30 @@ Les tests vont dans le sens de la stationnarité. L'ACF et la PACF donnent de mo
 
 Conclusion : Les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ semblent rendre la série stationnaire. Il est temps de construire les premiers modèles.
 
-# Modélisation
+## Modélisation
 
 Les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplissent le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)\times(P,D,Q)_s$.
 
 => Définition du modèle à développper.
 
 En pratique, on détermine les coefficients avec la méthode auto.arima
+
+```{r}
+model0 = auto.arima(decomp$random, allowmean=TRUE, allowdrift = TRUE)
+model0
+```
+Tous les coefficient sont significatifs.
+
+```{r}
+plot(decomp$random)
+lines(model0$fitted, col="red")
+```
+
+
+```{r}
+check_stat(model0$residuals)
+```
+
 
 ```{r}
 model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE)
@@ -214,7 +292,7 @@ Q-Q plot : pas gaussien
 
 On constate globalement que qu'il est possible d'obtenir des résidus bruit blanc. Cependant, ils ne semblent pas suivre une loi gaussienne. De plus, il possible que notre série soit légèrement hétéroscédastique. Des transformations telles que Box-Cox ou le passage au logarithme peuvent potentiellment atténuer voir corriger ce cela.
 
-## Transformation de Box-Cox et logarithmique
+### Transformation de Box-Cox et logarithmique
 
 ```{r}
 log_trainset = ts(log(trainset), start=1, frequency = 7)
@@ -312,7 +390,7 @@ bc_trainset = BoxCox(trainset, lambda="auto")
 plot(bc_trainset)
 ```
 
-Puis appliquones un auto.arima.
+Puis appliquons un auto.arima.
 ```{r}
 model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE)
 model5
@@ -333,16 +411,7 @@ Tous les coefs sont significatifs.
 ```{r}
 check_stat(model6$residuals)
 ```
-## Régression d'ordre 3
 
-```{r}
-t = 1:length(log_trainset)
-t2 = t^2
-t3 = t^3
-model7 = auto.arima(log_trainset, allowdrift=FALSE, xreg=cbind(t, t2, t3))
-model7
-```
-Les coeficients des variables exogènes t, t2 et t3 ne sont pas significatifs. De plus, le score score BIC est nettement plus faible. On ne retient pas ce modèle.
 
 ## Erreur de prédiction sur testset
 
@@ -351,27 +420,36 @@ Précédement, la comparaison des modèles était basées sur des critères int�
 Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Le score utilisé pour comparer les modèles est la RMSE.
 
 ```{r}
-
-help(forecast)
-```
-
-```{r}
 n = length(testset)
+
+pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)
+
+models = c("decomp + SARIMA",
+           "SARIMA (d=0, D=1)",
+           "SARIMA (d=1, D=1)",
+           "log + SARIMA (d=1, D=1)",
+           "log + SARIMA (d=1, D=1)",
+           "BoxCox + SARIMA (d=1, D=1)",
+           "Box-CoxSARIMA (d=1, D=1)",
+           "testset")
 
 pred1 = forecast(model1, h=n)
 pred2 = forecast(model2, h=n)
 pred3 = forecast(model3, h=n, biasadj=TRUE, lambda = 0)
 pred4 = forecast(model4, h=n, biasadj=TRUE, lambda = 0)
-pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.8999268)
-pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.8999268)
+pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7)
+pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7)
 
-plot(1:n, testset, col="black", type="l", xlab="Time")
-lines(1:n, pred1$mean, col="blue")
-lines(1:n, pred2$mean, col="red")
-lines(1:n, pred3$mean, col="purple")
-lines(1:n, pred4$mean, col="orange")
-lines(1:n, pred5$mean, col="brown")
-lines(1:n, pred6$mean, col="blue")
+# plot(trainset, xlim=c(0,45))
+plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 65))
+lines(ts(pred0, frequency=7, start=c(41,1)), col="gray")
+lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue")
+lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red")
+lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple")
+lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange")
+lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown")
+lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="blue")
+legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "blue", "black"), lw=1, box.lty=0, cex = 0.6)
 ```
 
 ```{r}
@@ -387,15 +465,16 @@ getPerformance = function(pred, val) {
 ```
 
 ```{r}
-perf1 = cbind(type = c("1"), getPerformance(as.vector(pred1$mean), as.vector(testset)))
-perf2 = cbind(type = c("2"), getPerformance(as.vector(pred2$mean), as.vector(testset)))
-perf3 = cbind(type = c("3"), getPerformance(as.vector(pred3$mean), as.vector(testset)))
-perf4 = cbind(type = c("4"), getPerformance(as.vector(pred4$mean), as.vector(testset)))
-perf5 = cbind(type = c("5"), getPerformance(as.vector(pred5$mean), as.vector(testset)))
-perf6 = cbind(type = c("6"), getPerformance(as.vector(pred6$mean), as.vector(testset)))
+perf0 = cbind(type = models[1], getPerformance(as.vector(pred0), as.vector(testset)))
+perf1 = cbind(type = models[2], getPerformance(as.vector(pred1$mean), as.vector(testset)))
+perf2 = cbind(type = models[3], getPerformance(as.vector(pred2$mean), as.vector(testset)))
+perf3 = cbind(type = models[4], getPerformance(as.vector(pred3$mean), as.vector(testset)))
+perf4 = cbind(type = models[5], getPerformance(as.vector(pred4$mean), as.vector(testset)))
+perf5 = cbind(type = models[6], getPerformance(as.vector(pred5$mean), as.vector(testset)))
+perf6 = cbind(type = models[7], getPerformance(as.vector(pred6$mean), as.vector(testset)))
 
-perf = rbind(perf1, perf2, perf3, perf4, perf5, perf6)
-models = c(1:6)
+perf = rbind(perf0, perf1, perf2, perf3, perf4, perf5, perf6)
+
 list(perf[order(perf$RMSE), ], models[order(perf$RMSE)])
 ```
 
