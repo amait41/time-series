@@ -114,32 +114,43 @@ Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat et ob
 pred_decomp = function(trainset, testset){
   n1 = length(trainset)
   n2 = length(testset)
+  # Fit decompose and apply reg lin on trend
   decomp = decompose(trainset)
   t = 1:n1
   t2 = t**2
   t3 = t**3
   reg_lin = lm(decomp$trend ~ t + t2 + t3)
+  train_trend = reg_lin$coefficients[1] + t * reg_lin$coefficients[2] + t2 * reg_lin$coefficients[3] + t3 * reg_lin$coefficients[4]
+  train_seasonal = decomp$seasonal
+  # Predict with h = length(testset)
   x = (n1 + 1) : (n1 + n2)
   x2 = x**2
   x3 = x**3
-  trend = reg_lin$coefficients[1] + x * reg_lin$coefficients[2] + x2 * reg_lin$coefficients[3] + x3 * reg_lin$coefficients[4]
+  pred_trend = reg_lin$coefficients[1] + x * reg_lin$coefficients[2] + x2 * reg_lin$coefficients[3] + x3 * reg_lin$coefficients[4]
   if (n2%%7==0){
-    print("ok")
-    seasons = c(rep(decomp$figure, n2%/%7))
+    pred_seasonal = c(rep(decomp$figure, n2%/%7))
   }else{
-    print(n2)
-    print(n2%/%7)
-    seasons = c(rep(decomp$figure, n2%/%7), decomp$figure[1:n2%%7])
+    pred_seasonal = c(rep(decomp$figure, n2%/%7), decomp$figure[1:n2%%7])
   }
-  trend + seasons
+  # pred_trend+pred_seasonal
+  list("train"=train_trend+train_seasonal, "pred"=pred_trend+pred_seasonal)
 }
 
-plot(pred_decomp(trainset, testset), type="l", ylab="Prédiction")
+decomp = pred_decomp(trainset, testset)
+# plot(trend_pred+season_pred, type="l", ylab="Prédiction")
+# train_trend = res[1]
+# train_season = res[2]
+# pred_trend = res[3]
+# pred_season = res[4]
+# plot(res)
+plot(decomp$train)
+plot(decomp$pred, type="l")
 ```
 Analysons à présent les résidus.
 
 ```{r}
-check_stat(decomp$random)
+decomp_residuals = trainset - decomp$train
+check_stat(decomp_residuals)
 ```
 Les résidus ne sont toujours pas stationnaires, ce dont on peut se rendre compte visuellement car on distingue une périodicité. L'ACF conforte cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), les résidus ne semblent pas suivre une loi gaussienne.
 
@@ -152,7 +163,7 @@ Soit une série temporelle avec $n$ observations. Différencier cette série à 
 ### Différenciation sur les résidus de la décomposition
 
 ```{r}
-diff_decompose = diff(diff(decomp$random, 7))
+diff_decompose = diff(decomp_residuals, 7)
 check_stat(diff_decompose)
 ```
 
@@ -198,13 +209,13 @@ Les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplis
 En pratique, on détermine les coefficients avec la méthode auto.arima
 
 ```{r}
-model0 = auto.arima(decomp$random, allowmean=TRUE, allowdrift = TRUE)
+model0 = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE)
 model0
 ```
 Tous les coefficient sont significatifs.
 
 ```{r}
-plot(decomp$random)
+plot(decomp_residuals)
 lines(model0$fitted, col="red")
 ```
 
@@ -386,7 +397,7 @@ Tout les termes sont significatifs.
 Effectuons la même procédure avec la transformation Box-Cox.
 
 ```{r}
-bc_trainset = BoxCox(trainset, lambda="auto")
+bc_trainset = BoxCox(trainset, lambda=-0.7)
 plot(bc_trainset)
 ```
 
@@ -422,14 +433,14 @@ Il est temps de comparer nous modèles sur des critères prédictifs. La procéd
 ```{r}
 n = length(testset)
 
-pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)
+pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred
 
-models = c("decomp + SARIMA",
+models = c("decomp + SARIMA (d=0, D=1)",
            "SARIMA (d=0, D=1)",
            "SARIMA (d=1, D=1)",
+           "log + SARIMA (d=0, D=1)",
            "log + SARIMA (d=1, D=1)",
-           "log + SARIMA (d=1, D=1)",
-           "BoxCox + SARIMA (d=1, D=1)",
+           "BoxCox + SARIMA (d=0, D=1)",
            "Box-CoxSARIMA (d=1, D=1)",
            "testset")
 
@@ -441,27 +452,15 @@ pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7)
 pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7)
 
 # plot(trainset, xlim=c(0,45))
-plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 65))
+plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 70))
 lines(ts(pred0, frequency=7, start=c(41,1)), col="gray")
 lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue")
 lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red")
 lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple")
 lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange")
 lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown")
-lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="blue")
-legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "blue", "black"), lw=1, box.lty=0, cex = 0.6)
-```
-
-```{r}
-getPerformance = function(pred, val) {
-    res = pred - val
-    MAE = sum(abs(res))/length(val)
-    MAPE = sum(abs(res)/abs(val)*100)/length(val)
-    RSS = sum(res^2)
-    MSE = RSS/length(val)
-    RMSE = sqrt(MSE)
-    perf = data.frame(MAE, MAPE, RSS, MSE, RMSE)
-}
+lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="green")
+legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "green", "black"), lw=1, box.lty=0, cex = 0.60)
 ```
 
 ```{r}

@@ -50,3 +50,14 @@ evaluate = function(model, trainset){
   print("------- Analyse des résidus -------")
   check_stat(model$residuals)
 }
+
+getPerformance = function(pred, val) {
+  # Compute metrics with y_pred=pred and y_true=val
+  res = pred - val
+  MAE = sum(abs(res))/length(val)
+  MAPE = sum(abs(res)/abs(val)*100)/length(val)
+  RSS = sum(res^2)
+  MSE = RSS/length(val)
+  RMSE = sqrt(MSE)
+  perf = data.frame(MAE, MAPE, RSS, MSE, RMSE)
+}
