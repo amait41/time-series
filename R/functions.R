@@ -1,3 +1,5 @@
+library(MLmetrics)
+
 checkupRes = function(Res){
   
   # Partitionnement de la fenêtre graphique 
@@ -51,13 +53,11 @@ evaluate = function(model, trainset){
   check_stat(model$residuals)
 }
 
-getPerformance = function(pred, val) {
-  # Compute metrics with y_pred=pred and y_true=val
-  res = pred - val
-  MAE = sum(abs(res))/length(val)
-  MAPE = sum(abs(res)/abs(val)*100)/length(val)
-  RSS = sum(res^2)
-  MSE = RSS/length(val)
-  RMSE = sqrt(MSE)
-  perf = data.frame(MAE, MAPE, RSS, MSE, RMSE)
+getPerformance = function(y_pred, y_true) {
+  # Compute metrics with y_pred and y_true
+  MAE = MAE(y_pred, y_true)
+  MAPE = MAPE(y_pred, y_true)
+  MSE = MSE(y_pred, y_true)
+  RMSE = RMSE(y_pred, y_true)
+  perf = data.frame(MAE, MAPE, MSE, RMSE)
 }
