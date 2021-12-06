@@ -18,13 +18,13 @@ source(file = "functions.R")
 
 => Intro sur les séries temporelles
 
-L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise angevine de livraison de repas à domicile, Frères Toque. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour de l'entreprise angevine de livraison de repas à domicile. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
 
 ```{r}
 data = read.csv('orders.csv')
 trainset = ts(data$n_orders[1:280], frequency=7)
 testset = ts(data$n_orders[281:308], frequency=7)
-plot(trainset, type='l')
+plot(trainset, type='l', xlab="Période", ylab="# commades")
 ```
 Cette série présente plusieurs caractéristiques remarquables.
 
@@ -39,36 +39,39 @@ t3 = 247:280; X3 = trainset[t3]
 lm1 = lm(X1~t1)
 lm2 = lm(X2~t2)
 lm3 = lm(X3~t3)
-plot(1:length(trainset), trainset, type='l', xlab="Période", ylab="Commandes")
+plot(t1, X1, type='l', xlab="Index", ylab="# commandes", xlim=c(0,length(trainset)))
 lines(t2, X2, type="l", col="blue")
 lines(t3, X3, type="l", col="red")
-lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
-lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
-lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
+# lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
+# lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
+# lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
 ```
+Poursuivons l'analyse de la série avec l'étude de l'AFC, de la PAFC ainsi que des tests de stationarité.
+
+> Une série chronologique est *stationnaire* (du second ordre) si sa moyenne et sa covariance sont invariantes par translation dans le temps.
+
 ```{r}
-acf(trainset, lag.max = 50)
-pacf(trainset, lag.max = 50)
+layout(matrix(c(1, 1, 2, 2), nrow=1, ncol=4, byrow=TRUE))
+acf(trainset, lag.max = 50, main="")
+pacf(trainset, lag.max = 50, main="")
 Box.test(trainset, type="Ljung-Box", lag=7)
 adf.test(trainset)
 kpss.test(trainset)
 McLeod.Li.test(y=trainset)
 ```
-Analysons le résultats des tests (voir présentation des tests en Annexe 1 si besoin).
+L'ACF est 
 
 L'ACF présente des pics périodiques significatifs majoritairement. On ne peut donc pas conclure que la série est stationnaire car elle possède une composante saisonnière.
 
-La PACF possède des corrélations partielles significatives des lags 1 et 3 à 7 ainsi qu'au lag 14. Ainsi, on en conclut que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
+La PACF possède des corrélations partielles significatives aux lags 1 et 2 et aux lags 5 à 8 ainsi qu'au lag 14. Ainsi, on en conclut que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
 
 Les tests ADF et KPSS s'accordent sur la même conclusion : la série est stationnaire. Cependant on voit bien que la variance ne reste pas constante, ce que les tests ADF et KPSS ne détectent pas.
 
 Le test McLoed.Li nous pousse à conclure qu'il n'y a pas d'heteroscédasticité au sein de la série.
 
-En conclusion, la série n'est pas stationnaire car elle présente une saisonalité d'ordre 7 et une variance qui évolue au fil du temps. Il peut être intéressant d'appliquer des transformations pour atténuer les variations de cette dernière.
+En conclusion, la série n'est pas stationnaire car elle présente une saisonalité hebdomadaire et une variance qui évolue au fil du temps. Il peut être intéressant d'appliquer des transformations pour atténuer les variations de cette dernière.
 
 Dans la partie suivante, nous allons implémenter plusieurs approches afin de rendre la série stationnaire (au second ordre). 
-
-> Une série chronologique est *stationnaire* (du second ordre) si sa moyenne et sa covariance sont invariantes par translation dans le temps.
 
 Ainsi, nous appliquerons dans un premier temps un modèle simple, la décomposition. Puis dans un second et troisième temps, nous testerons des méthodes de différenciation et de régression.
 
@@ -111,41 +114,11 @@ lines(reg_lin4$fitted.values, type="l", col="green")
 Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat et obtienent un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garde la régression linéaire d'ordre 3.
 
 ```{r}
-pred_decomp = function(trainset, testset){
-  n1 = length(trainset)
-  n2 = length(testset)
-  # Fit decompose and apply reg lin on trend
-  decomp = decompose(trainset)
-  t = 1:n1
-  t2 = t**2
-  t3 = t**3
-  reg_lin = lm(decomp$trend ~ t + t2 + t3)
-  train_trend = reg_lin$coefficients[1] + t * reg_lin$coefficients[2] + t2 * reg_lin$coefficients[3] + t3 * reg_lin$coefficients[4]
-  train_seasonal = decomp$seasonal
-  # Predict with h = length(testset)
-  x = (n1 + 1) : (n1 + n2)
-  x2 = x**2
-  x3 = x**3
-  pred_trend = reg_lin$coefficients[1] + x * reg_lin$coefficients[2] + x2 * reg_lin$coefficients[3] + x3 * reg_lin$coefficients[4]
-  if (n2%%7==0){
-    pred_seasonal = c(rep(decomp$figure, n2%/%7))
-  }else{
-    pred_seasonal = c(rep(decomp$figure, n2%/%7), decomp$figure[1:n2%%7])
-  }
-  # pred_trend+pred_seasonal
-  list("train"=train_trend+train_seasonal, "pred"=pred_trend+pred_seasonal)
-}
-
-decomp = pred_decomp(trainset, testset)
-# plot(trend_pred+season_pred, type="l", ylab="Prédiction")
-# train_trend = res[1]
-# train_season = res[2]
-# pred_trend = res[3]
-# pred_season = res[4]
-# plot(res)
+decomp = decomp(trainset, testset)
 plot(decomp$train)
 plot(decomp$pred, type="l")
 ```
+
 Analysons à présent les résidus.
 
 ```{r}

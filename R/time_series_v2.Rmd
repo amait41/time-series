@@ -1,0 +1,86 @@
+--
+title: "Série Chronologique - Projet"
+output:
+  html_notebook: 
+    toc: yes
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r}
+library(TSA)
+library(tseries)
+library(forecast)
+source(file = "functions.R")
+```
+
+# Introduction
+
+=> Intro sur les séries temporelles
+
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise angevine de livraison de repas à domicile, Frères Toque. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+
+```{r}
+data = read.csv('orders.csv')
+trainset = ts(data$n_orders[1:280], frequency=7)
+testset = ts(data$n_orders[281:308], frequency=7)
+plot(trainset, type='l')
+```
+
+```{r}
+n1 = length(trainset)
+intercept = rep(1, n1)
+t = 1:n1
+t2 = t**2
+t3 = t**3
+
+decomp_ = decomp(trainset, testset)
+decomp_residuals = trainset - decomp_$train
+decomp_sarima = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE)
+print(decomp_sarima)
+sarima = auto.arima(trainset, allowmean=TRUE, allowdrift = TRUE)
+print(sarima)
+log_sarima = auto.arima(log(trainset), allowmean=TRUE, allowdrift=TRUE)
+print(log_sarima)
+bc_sarima = auto.arima(BoxCox(trainset, lambda=-0.45), allowdrift=TRUE, allowmean=TRUE)
+print(bc_sarima)
+sarima_xreg = auto.arima(trainset, xreg=cbind(t, t2, t3))
+print(sarima_xreg)
+holt_winters = HoltWinters(trainset, seasonal="additive")
+print(holt_winters)
+```
+
+
+```{r}
+n2 = length(testset)
+x = (n1+1):(n1+n2)
+x2 = x**2
+x3 = x**3
+models = c("decomp + SARIMA(2,0,1)(2,1,2)[7]",
+           "SARIMA(3,0,4)(1,1,1)[7]",
+           "log + SARIMA(2,0,3)(0,1,1)[7]",
+           "BoxCox + SARIMA(1,0,2)(2,1,2)[7]",
+           "Holt-Winters",
+           "SARIMA(1,0,0)(2,0,0)[7] + xreg",
+           "testset")
+
+decomp_sarima_pred = forecast(decomp_sarima, h=n2)$mean + decomp_$pred
+sarima_pred = forecast(sarima, h=n2)
+log_sarima_pred = forecast(log_sarima, h=n2, biasadj=TRUE, lambda = 0)
+bc_sarima_pred = forecast(bc_sarima, h=n2, biasadj=TRUE, lambda = -0.45)
+sarima_xreg_pred = forecast(sarima_xreg, h=n2, xreg=cbind(t, t2, t3))
+hw_pred = forecast(holt_winters, h=n2)
+```
+
+```{r}
+perf0 = cbind(type = models[1], getPerformance(as.vector(decomp_sarima_pred), as.vector(testset)))
+perf1 = cbind(type = models[2], getPerformance(as.vector(sarima_pred$mean), as.vector(testset)))
+perf2 = cbind(type = models[3], getPerformance(as.vector(log_sarima_pred$mean), as.vector(testset)))
+perf3 = cbind(type = models[4], getPerformance(as.vector(bc_sarima_pred$mean), as.vector(testset)))
+perf4 = cbind(type = models[5], getPerformance(as.vector(sarima_xreg_pred$mean), as.vector(testset)))
+perf_hw = cbind(type = models[6], getPerformance(as.vector(hw_pred$mean), as.vector(testset)))
+
+perf = rbind(perf0, perf1, perf2, perf3, perf4, perf_hw)
+
+list(perf[order(perf$RMSE), ], models[order(perf$RMSE)])
+```
