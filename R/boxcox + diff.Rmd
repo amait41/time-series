@@ -8,8 +8,8 @@ output: html_notebook
 library(TSA)
 library(forecast)
 library(tseries)
-data = read.csv('orders.csv')
 source('functions.R')
+data = read.csv('orders.csv')
 ```
 
 Données : 308 jours (44 semaines) à partir du 4 janvier 2021
@@ -24,12 +24,14 @@ timeSeries = ts(data$n_orders[1:280], frequency=7)
 plot(timeSeries, type='l')
 ```
 
-
-
 La série n'est clairement pas stationnaire. On peut dans un premier temps tenter de réduire la variance par une transformation de BoxCox
+```{r}
+help(BoxCox)
+```
 
 ```{r}
-lambd = BoxCox.lambda(timeSeries)
+lambd = BoxCox.lambda(timeSeries, lower=-2, upper=2, method="loglik")
+lambd
 ```
 
 -1 : 8.9% (BoxCox.lambda(timeSeries))
@@ -120,7 +122,7 @@ pacf(as.numeric(DBoxCoxTS2),lag.max = 40)
 ```
 
 ```{r}
-mod1 = auto.arima(BoxCoxTS,allowmean = TRUE, max.D = 1, max.d = 0, max.p = 8, max.q = 7, allowdrift = TRUE)
+mod1 = auto.arima(BoxCoxTS,allowmean = TRUE, D = 1, d = 0, max.p = 8, max.q = 7, allowdrift = TRUE)
 mod1
 ```
 
@@ -147,13 +149,11 @@ Le coefficient sma1 n'est pas significatif mais sma2 l'est, donc on ne rétrogra
 
 Erreur finale
 ```{r}
-library(bimixt)
-pred = forecast(mod1,h=28)
+library(MLmetrics)
+pred = forecast(mod1, h=28)
 
-pred_val = boxcox.inv(pred$mean,lambd)
-MAPE = 100/28*sum(abs((pred_val-timeSeriesTest))/pred_val)
-MAPE
-
+pred_val = boxcox.inv(pred$mean, lambd)
+MAPE(pred_val, timeSeriesTest)
 plot(pred)
 ```
 
