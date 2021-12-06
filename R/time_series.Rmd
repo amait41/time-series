@@ -170,6 +170,14 @@ check_stat(diff_decompose)
 ### Différenciation sur la série original
 
 ```{r}
+ndiffs(trainset)
+```
+```{r}
+Acf(trainset)
+```
+
+
+```{r}
 diff1 = diff(trainset)
 check_stat((diff1))
 ```
@@ -223,7 +231,10 @@ lines(model0$fitted, col="red")
 ```{r}
 check_stat(model0$residuals)
 ```
-
+```{r}
+model1 = auto.arima(trainset, allowmean=TRUE, allowdrift = TRUE)
+model1
+```
 
 ```{r}
 model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE)
@@ -307,14 +318,14 @@ On constate globalement que qu'il est possible d'obtenir des résidus bruit blan
 
 ```{r}
 log_trainset = ts(log(trainset), start=1, frequency = 7)
-plot(log_trainset)
+autoplot(log_trainset)
 ```
 On a réussi à bien réduire la variance. Voyons ce que disent les tests ADF et KPSS.
 
 ```{r}
 LogTS = log_trainset
 DLogTS1 = diff(LogTS)
-plot(DLogTS1)
+autoplot(DLogTS1)
 ```
 ```{r}
 kpss.test(DLogTS1)
@@ -431,7 +442,6 @@ plot(holt_winters)
 ```{r}
 check_stat(trainset - holt_winters$fitted[,1])
 ```
-
 
 ## Erreur de prédiction sur testset
 
