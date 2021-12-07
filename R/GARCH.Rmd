@@ -47,7 +47,6 @@ lines(ts(fitted(mod1), start=1, frequency=7),col='red',type='l')
 
 Erreur finale
 ```{r}
-mod1 = garchFit(~arma(0,0)+garch(1, 1), timeSeries)
 pred = predict(object=mod1, n.ahead=28, plot=TRUE)
 
 #pred_val = pred$meanForecast
