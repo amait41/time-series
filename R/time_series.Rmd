@@ -1,79 +1,98 @@
 ---
 title: "Série Chronologique - Projet"
 output:
+  pdf_document: default
   html_notebook: 
     toc: yes
     code_folding: hide
-  pdf_document: default
 ---
 
 ```{r}
 library(TSA)
 library(tseries)
 library(forecast)
+library(ggplot2)
 source(file = "functions.R")
 ```
 
 # Introduction
 
-=> Intro sur les séries temporelles
-
-L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour de l'entreprise angevine de livraison de repas à domicile. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour de l'entreprise angevine de livraison de repas à domicile. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Notre objectif sera d'étudier cette série et de construire un modèle parmi les déclinaisons des modèles $ARMA$.
 
 ```{r}
 data = read.csv('orders.csv')
-trainset = ts(data$n_orders[1:280], frequency=7)
-testset = ts(data$n_orders[281:308], frequency=7)
-plot(trainset, type='l', xlab="Période", ylab="# commades")
+trainset = ts(data$n_orders, start=1, end=40, frequency=7)
+testset = ts(data$n_orders, start=41, end=44, frequency=7)
+plot(trainset, type='l', xlab="Période", ylab="# commades", main="Nombre de commandes par jour (trainset)")
 ```
+
 Cette série présente plusieurs caractéristiques remarquables.
 
 Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre de commandes croit du dimanche au vendredi puis décroît le samedi en moyenne.
 
 La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
 
-```{r}
+```{r fig.width = 15, fig.height=5}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+# Segmentation
 t1 = 1:126; X1 = trainset[t1]
 t2 = 127:246; X2 = trainset[t2]
 t3 = 247:280; X3 = trainset[t3]
 lm1 = lm(X1~t1)
 lm2 = lm(X2~t2)
 lm3 = lm(X3~t3)
-plot(t1, X1, type='l', xlab="Index", ylab="# commandes", xlim=c(0,length(trainset)))
+plot(t1, X1, type='l', xlab="Index", ylab="# commandes", main="Segmentation de la série temporelle", xlim=c(0,length(trainset)))
 lines(t2, X2, type="l", col="blue")
 lines(t3, X3, type="l", col="red")
-# lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
-# lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
-# lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
-```
-Poursuivons l'analyse de la série avec l'étude de l'AFC, de la PAFC ainsi que des tests de stationarité.
+lines(t1, lm1$coefficients[1]+ t1 * lm1$coefficients[2])
+lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
+lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
 
-> Une série chronologique est *stationnaire* (du second ordre) si sa moyenne et sa covariance sont invariantes par translation dans le temps.
+# Saisonalité
+seasonplot(trainset, type="l", main="Graphique saisonnier", xlab="Jour", ylab="# commandes", season.labels=c("Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"))
+```
+Les modèles $ARMA$ font l'hypothèse que la série temporelle $(X_t)$ est stationnaire (du second ordre), c'est à dire que sa moyenne et sa covariance sont invariantes par translation dans le temps:<br>
+- $\mathbb{E}[X_t]=m(t)=m$ pour tout $t \in \mathbb{Z}$.<br>
+- $Cov(X_t, X_s) = \Gamma(t, s) = \Gamma(t+k, s+k)$ pour tout $(t,s) \in \mathbb{Z}^2$ et tout décalage temporelle $k \in \mathbb{Z}$.<br>
+
+Cette hypothèse est nécéssaire car ... .
+
+En plus de l'aspect visuel, nous utiliserons les tests suivants pour étudier sur la stationarité :<br>
+- Le test ADF avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus non stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
+- Le test KPSS avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
 
 ```{r}
-layout(matrix(c(1, 1, 2, 2), nrow=1, ncol=4, byrow=TRUE))
-acf(trainset, lag.max = 50, main="")
-pacf(trainset, lag.max = 50, main="")
-Box.test(trainset, type="Ljung-Box", lag=7)
 adf.test(trainset)
 kpss.test(trainset)
-McLeod.Li.test(y=trainset)
 ```
-L'ACF est 
+Les tests s'accordent. En effet, le test ADF ne rejette pas l'hypothèse de stationarité (p-value>>0.05) alors que le test KPSS rejette l'hypothèse de non-stationarité (p-value<<0.05).
 
+=> Remarque sur la stat visuellement, transformation
+(Cependant on voit bien que la variance ne reste pas constante, ce que les tests ADF et KPSS ne détectent pas.)
+
+De manière général, lorsque l'on souhaite modéliser une série temporelle, on applique un modèle pour tenter d'obtenir des résidus centré et de même variance finie aussi appellé *bruit blanc*. Ainsi, on s'appuie en particulier sur le test l'auto-corrélation de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "la série temporelle ne possède pas d'autocorrélation".
+
+```{r}
+Box.test(trainset, type="Ljung-Box")
+```
+En ce qui concerne notre série temporelle, on rejette fortement cette hypothèse.
+
+Nous présentons maintenant deux outils indispensable à l'étude des séries temporelles: l'ACF et la PAFC.
+
+L'AFC représente les autocorrélation entre deux valeurs distantes de $h$ dans le temps. Une autocorrélation nulle à partir d'un rang $q+1$ est caractéristique d'un processus $MA(q)$. L'autocorrélogramme PAFC représente quand à lui les corrélation "pur" entre deux valeurs distantes de $h$ dans le temps, c'est à dire entre lesquelles on a supprimé l'influence linéaire des valeurs intermédiaires. Une PACF avec des pics dans le couloir de non-significativité à partir du rang $p+1$ est caractéristique d'un processus $AR(p)$.
+
+```{r fig.width = 15, fig.height=5, echo=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+acf(trainset, lag.max = 50, main="")
+pacf(trainset, lag.max = 50, main="")
+```
 L'ACF présente des pics périodiques significatifs majoritairement. On ne peut donc pas conclure que la série est stationnaire car elle possède une composante saisonnière.
 
 La PACF possède des corrélations partielles significatives aux lags 1 et 2 et aux lags 5 à 8 ainsi qu'au lag 14. Ainsi, on en conclut que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
 
-Les tests ADF et KPSS s'accordent sur la même conclusion : la série est stationnaire. Cependant on voit bien que la variance ne reste pas constante, ce que les tests ADF et KPSS ne détectent pas.
+En conclusion, la série n'est pas stationnaire et présente une saisonalité hebdomadaire ainsi qu'une variance fluctuante au fil du temps.
 
-Le test McLoed.Li nous pousse à conclure qu'il n'y a pas d'heteroscédasticité au sein de la série.
-
-En conclusion, la série n'est pas stationnaire car elle présente une saisonalité hebdomadaire et une variance qui évolue au fil du temps. Il peut être intéressant d'appliquer des transformations pour atténuer les variations de cette dernière.
-
-Dans la partie suivante, nous allons implémenter plusieurs approches afin de rendre la série stationnaire (au second ordre). 
-
-Ainsi, nous appliquerons dans un premier temps un modèle simple, la décomposition. Puis dans un second et troisième temps, nous testerons des méthodes de différenciation et de régression.
+Pour rendre cette série stationnaire, nous allons utiliser plusieurs approches tel que la décomposition (partie 2.1) et la différentiation (partie 2.2). Puis nous construirons et comparons nos modèle $ARIMA$ à l'aide des fonction `auto.arima` et `checkup_res` (partie 3) avant d'évaluer nos modèles sur le jeu de données test avec des critères prédictifs  (partie 4).
 
 # Stationarité
 
@@ -81,57 +100,59 @@ Ainsi, nous appliquerons dans un premier temps un modèle simple, la décomposit
 
 La fonction `decompose` renvoie une tendance, une composante saisonnière ainsi que des résidus. 
 
-```{r}
-decomp = decompose(trainset)
-plot(decomp)
+```{r, fig.width = 8, fig.height=5, echo=FALSE}
+decomposition = decompose(trainset)
+plot(decomposition)
 ```
 
 La fonction `decompose` détermine d'abord la composante de tendance en utilisant une moyenne mobile, et la supprime de la série chronologique. Ici, on voit que l'on pourrait l'approximer par une tendance d'ordre 3. Ensuite, la figure saisonnière est calculée en faisant la moyenne, pour chaque unité de temps, de toutes les périodes. La figure saisonnière est ensuite centrée. Enfin, la composante d'erreur est déterminée en retirant la tendance et la figure saisonnière (dupliquée si nécessaire) de la série temporelle originale.
 
-Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une regression linéaire sur la tendance puis y ajouter composante saisonnière.
+Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une regression linéaire sur la tendance puis y ajouter la composante saisonnière.
 
-```{r}
-t = 1:length(decomp$trend)
+```{r, echo=FALSE}
+t = 1:length(decomposition$trend)
 t2 = t^2
 t3 = t^3
 t4 = t^4
-reg_lin1 = lm(decomp$trend ~ t)
-reg_lin2 = lm(decomp$trend ~ t + t2)
-reg_lin3 = lm(decomp$trend ~ t + t2 + t3)
-reg_lin4 = lm(decomp$trend ~ t + t2 + t3 + t4)
-summary(reg_lin1)
-summary(reg_lin2)
-summary(reg_lin3)
-summary(reg_lin4)
+reg_lin1 = lm(decomposition$trend ~ t)
+reg_lin2 = lm(decomposition$trend ~ t + t2)
+reg_lin3 = lm(decomposition$trend ~ t + t2 + t3)
+reg_lin4 = lm(decomposition$trend ~ t + t2 + t3 + t4)
+# summary(reg_lin1)
+# summary(reg_lin2)
+# summary(reg_lin3)
+# summary(reg_lin4)
 
-plot(t, as.numeric(decomp$trend), type="l")
+plot(t, as.numeric(decomposition$trend), type="l", lwd=1.5, main="Regression sur la tendance", ylab="Tendance", xlab="Temps")
 lines(reg_lin1$fitted.values, type="l")
 lines(reg_lin2$fitted.values, type="l", col="blue")
 lines(reg_lin3$fitted.values, type="l", col="red")
 lines(reg_lin4$fitted.values, type="l", col="green")
+legend("topright", legend=c("ordre 1", "ordre 2", "ordre 3", "ordre 4"), col=c("black", "blue", "red", "green"), lw=1)
+```
+Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat et obtienent un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garder la régression linéaire d'ordre 3.
+
+```{r warning=FALSE}
+# retourne la tendance sommée avec la composante saisonnière pour le trainset et le testset.
+decomposition = decomp(trainset, testset)
 ```
 
-Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat et obtienent un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garde la régression linéaire d'ordre 3.
+Analysons à présent les résidus de la décomposition.
 
 ```{r}
-decomp = decomp(trainset, testset)
-plot(decomp$train)
-plot(decomp$pred, type="l")
-```
-
-Analysons à présent les résidus.
-
-```{r}
-decomp_residuals = trainset - decomp$train
+decomp_residuals = trainset - decomposition$train
 check_stat(decomp_residuals)
 ```
+
 Les résidus ne sont toujours pas stationnaires, ce dont on peut se rendre compte visuellement car on distingue une périodicité. L'ACF conforte cette hypothèse par la périodicité de ses pics significatifs. De plus, d'après l'histogramme, le QQ_plot et le test de Shapiro (p-value=0.05), les résidus ne semblent pas suivre une loi gaussienne.
 
 Un modèle ARMA ne peut être appliqué car la série n'est pas stationnaire. La technique privilégier est la différenciation. Nous expliquons et appliquons cette technique dans la partie suivante.
 
 ## Différenciation
 
-Soit une série temporelle avec $n$ observations. Différencier cette série à l'ordre $d$ consiste à lui appliquer le filtre $(I-B^d)$. On regarde alors si $\Delta X_t = (I-B^d)X_t$ est stationnaire.
+Introduisons l'opérateur de retard $B$ qui à une donnée chronologique donnée lui associe sa valeur précédante. On a alors $B^0X_t=IX_t=X_t$, $B^kX_t=X_{t-k}$ et $B^{-k}X_t = X_{t+k}$.
+
+Différencier une série temporelle à l'ordre $d$ consiste à lui appliquer le filtre $(I-B^d)$. On regarde alors si $\Delta X_t = (I-B^d)X_t$ est stationnaire.
 
 ### Différenciation sur les résidus de la décomposition
 
@@ -143,17 +164,10 @@ check_stat(diff_decompose)
 ### Différenciation sur la série original
 
 ```{r}
-ndiffs(trainset)
-```
-```{r}
-Acf(trainset)
-```
-
-
-```{r}
 diff1 = diff(trainset)
 check_stat((diff1))
 ```
+
 Les tests KPSS et ADF obtiennent des p-value respective supérieur à 0.1 et inférieur à 0.01. On pourrait alors penser que cette série est stationnaire. Néanmoins cette différenciation n'est pas concluante car:
 - On observe une saisonalité de la série graphiquement
 - L'ACF montre aussi un saisonalité avec des pics très significatifs en 7, 14 et 21.
@@ -176,56 +190,35 @@ Essayons de différencier à nouveau la série, c'est à dire d'appliquer le fil
 diff3 = diff(diff(trainset,7))
 check_stat(diff3)
 ```
-
 Les tests vont dans le sens de la stationnarité. L'ACF et la PACF donnent de moins bon résultat dans le sens où il y a respectivement au moins 6 pics significatifs dont certains aù delà de 10. La série ne semble toujours suivre une loi gaussienne.
 
-Conclusion : Les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ semblent rendre la série stationnaire. Il est temps de construire les premiers modèles.
+Conclusion, les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplissent le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)\times(P,D,Q)_7$ avec $(d,D)=(0,1)$ ou $(d,D)=(1,1)$.
 
 ## Modélisation
 
-Les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplissent le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)\times(P,D,Q)_s$.
+=> Définition du modèle à développper avec un exemple.
 
-=> Définition du modèle à développper.
-
-En pratique, on détermine les coefficients avec la méthode auto.arima
+En pratique, on détermine les coefficients avec la méthode auto.arima.
 
 ```{r}
-model0 = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE)
-model0
-```
-Tous les coefficient sont significatifs.
-
-```{r}
-plot(decomp_residuals)
-lines(model0$fitted, col="red")
+model = auto.arima(trainset, allowmean=TRUE, allowdrift=TRUE)
+model
 ```
 
-
-```{r}
-check_stat(model0$residuals)
-```
-```{r}
-model1 = auto.arima(trainset, allowmean=TRUE, allowdrift = TRUE)
-model1
-```
-
-```{r}
-model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE)
-model1
-```
-Tous les termes sont significatifs. On obtient un score BIC de 1796.31.
+=> Détails : Tous les termes sont significatifs. On obtient un score BIC de 1796.31.
 
 ```{r}
 plot(trainset)
-lines(model1$fitted, col='red')
+lines(model$fitted, col='red')
 ```
 Visuellement, le modèle s'adapte relativement bien aux données. Analysons les résidus de ce premier modèle.
 
 ```{r}
-check_stat(model1$residuals)
+check_stat(model$residuals)
 ```
-#### Conclusion des tests
-Stat
+Pour considérer que le modèle est bon, les résidus doivent former un bruit blanc. Cela se décline en en deux partie.
+
+#### Stationarité des résidus
 Box-Ljung : bb au risque de 5%
 KPSS : pas non-stationnaire
 ADF : stationnaire
@@ -234,281 +227,333 @@ ACF : pas de pics significatifs
 PACF : pas de pics significatifs
 Lag 1 : indpt
 
-Normalité
+#### Normalité des résidus
 Shapiro : pas gaussien
 Histogramme : pas gaussien
 Q-Q plot : pas gaussien
 
-Passons en analyse du deuxième modèle.
 
-```{r}
-model2 = auto.arima(trainset, D=1, d=1, allowmean=TRUE, allowdrift=TRUE)
-model2
-```
-Tous les termes sauf sar1 sont significatifs, il serait donc judicieux de tester le modèle $SARIMA(2,1,3)\times(0,1,1)_7$.
+<!-- # Annexe 1 -->
 
-```{r}
-model2 = Arima(trainset, order=c(2,1,3), seasonal=list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE)
-model2
-```
-Encore une fois, on a un terme non significatif (ar2), testons le modèle $SARIMA(1,1,3)\times(0,1,1)_7$.
+<!-- ```{r} -->
+<!-- model0 = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE) -->
+<!-- model0 -->
+<!-- ``` -->
+<!-- Tous les coefficient sont significatifs. -->
 
-```{r}
-model2 = Arima(trainset,order = c(1,1,3), seasonal = list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE)
-model2
-```
-Cette troisième tentative semble meilleure du point de vue du BIC avec un score de 1726.91.
-
-```{r}
-plot(trainset)
-lines(model2$fitted,col='red')
-```
-Le modèle s'applique relativement bien aux donnée.
-
-Analyse des résidus du modèle 2:
-
-```{r}
-check_stat(model2$residuals)
-```
-#### Conclusion des tests
-Stationarité
-Box-Ljung : bb avec p-val=0.89
-KPSS : stationnaire
-ADF : stationnaire
-Plot : pas de saisonalité, semble centrée
-ACF : 1 pic légèrement significatif en 10 (posssiblement un artefact)
-PACF : 1 pic légèrement significatif en 10 (posssiblement un artefact)
-Lag 1 : indpt
-
-Normalité
-Shapiro : pas gaussien
-Histogramme : pas gaussien
-Q-Q plot : pas gaussien
-
-On constate globalement que qu'il est possible d'obtenir des résidus bruit blanc. Cependant, ils ne semblent pas suivre une loi gaussienne. De plus, il possible que notre série soit légèrement hétéroscédastique. Des transformations telles que Box-Cox ou le passage au logarithme peuvent potentiellment atténuer voir corriger ce cela.
-
-### Transformation de Box-Cox et logarithmique
-
-```{r}
-log_trainset = ts(log(trainset), start=1, frequency = 7)
-autoplot(log_trainset)
-```
-On a réussi à bien réduire la variance. Voyons ce que disent les tests ADF et KPSS.
-
-```{r}
-LogTS = log_trainset
-DLogTS1 = diff(LogTS)
-autoplot(DLogTS1)
-```
-```{r}
-kpss.test(DLogTS1)
-adf.test(DLogTS1)
-```
-Les tests vont dans le sens de la stationnarité
-
-```{r}
-acf(as.numeric(DLogTS1), lag.max=40)
-pacf(as.numeric(DLogTS1), lag.max=40)
-```
-Mais pas l'ACF où un motif périodique se dessine clairement.
-On voit néanmois qu'on a réussi à éliminer la tendance. 
-Pour éliminer le motif périodique, essayons une différenciation d'ordre 7
+<!-- ```{r} -->
+<!-- plot(decomp_residuals) -->
+<!-- lines(model0$fitted, col="red") -->
+<!-- ``` -->
 
 
-Differenciation I-B⁷
-```{r}
-DLogTS2 = diff(LogTS,7)
-plot(DLogTS2)
-```
+<!-- ```{r} -->
+<!-- check_stat(model0$residuals) -->
+<!-- ``` -->
 
-```{r}
-kpss.test(DLogTS2)
-adf.test(DLogTS2)
-```
-Les tests vont dans le sens de la stationnarité
+<!-- Néanmoins, pour plus de concisions nous allons n'effectuer ici uniquement l'analyse des résidus pour ce premier modèle. L'analyse détaillée est en Annexe 1. Le tableau ci dessous résume l'analyse des résidus des différants modèles. -->
 
-```{r}
-acf(as.numeric(DLogTS2), lag.max=40)
-pacf(as.numeric(DLogTS2), lag.max=40)
-```
-ACF : décroissance rapide avec un pic à 7
-PACF : 
+<!-- ```{r} -->
+<!-- model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE) -->
+<!-- model1 -->
+<!-- ``` -->
+<!-- Tous les termes sont significatifs. On obtient un score BIC de 1796.31. -->
 
+<!-- ```{r} -->
+<!-- plot(trainset) -->
+<!-- lines(model1$fitted, col='red') -->
+<!-- ``` -->
+<!-- Visuellement, le modèle s'adapte relativement bien aux données. Analysons les résidus de ce premier modèle. -->
 
-Differenciation (I-B)(I-B⁷)
-```{r}
-DLogTS3 = diff(diff(LogTS,7))
-plot(DLogTS3)
-```
+<!-- ```{r} -->
+<!-- check_stat(model1$residuals) -->
+<!-- ``` -->
+<!-- #### Conclusion des tests -->
+<!-- Stat -->
+<!-- Box-Ljung : bb au risque de 5% -->
+<!-- KPSS : pas non-stationnaire -->
+<!-- ADF : stationnaire -->
+<!-- Plot : ras -->
+<!-- ACF : pas de pics significatifs -->
+<!-- PACF : pas de pics significatifs -->
+<!-- Lag 1 : indpt -->
 
-```{r}
-kpss.test(DLogTS3)
-adf.test(DLogTS3)
-```
-Les tests vont dans le sens de la stationnarité
+<!-- Normalité -->
+<!-- Shapiro : pas gaussien -->
+<!-- Histogramme : pas gaussien -->
+<!-- Q-Q plot : pas gaussien -->
 
-```{r}
-acf(as.numeric(DLogTS3), lag.max=40)
-pacf(as.numeric(DLogTS3), lag.max=40)
-```
+<!-- Passons en analyse du deuxième modèle. -->
 
+<!-- ```{r} -->
+<!-- model2 = auto.arima(trainset, D=1, d=1, allowmean=TRUE, allowdrift=TRUE) -->
+<!-- model2 -->
+<!-- ``` -->
+<!-- Tous les termes sauf sar1 sont significatifs, il serait donc judicieux de tester le modèle $SARIMA(2,1,3)\times(0,1,1)_7$. -->
 
-Conclusion : Il est judicieux de considérer les séries DLogTS2 et DLogTS dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries.
+<!-- ```{r} -->
+<!-- model2 = Arima(trainset, order=c(2,1,3), seasonal=list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE) -->
+<!-- model2 -->
+<!-- ``` -->
+<!-- Encore une fois, on a un terme non significatif (ar2), testons le modèle $SARIMA(1,1,3)\times(0,1,1)_7$. -->
 
+<!-- ```{r} -->
+<!-- model2 = Arima(trainset,order = c(1,1,3), seasonal = list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE) -->
+<!-- model2 -->
+<!-- ``` -->
+<!-- Cette troisième tentative semble meilleure du point de vue du BIC avec un score de 1726.91. -->
 
-```{r}
-model3 = auto.arima(log_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE)
-model3
-```
-Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle
+<!-- ```{r} -->
+<!-- plot(trainset) -->
+<!-- lines(model2$fitted,col='red') -->
+<!-- ``` -->
+<!-- Le modèle s'applique relativement bien aux donnée. -->
 
-```{r}
-plot(log_trainset)
-lines(model3$fitted,col='red')
-```
-Analyse des résidus du modèle
-```{r}
-check_stat(model3$residuals)
-```
+<!-- Analyse des résidus du modèle 2: -->
 
-Deuxième modèle
-```{r}
-model4 = auto.arima(log_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
-model4
-```
-Tout les termes sont significatifs.
+<!-- ```{r} -->
+<!-- check_stat(model2$residuals) -->
+<!-- ``` -->
+<!-- #### Conclusion des tests -->
+<!-- Stationarité -->
+<!-- Box-Ljung : bb avec p-val=0.89 -->
+<!-- KPSS : stationnaire -->
+<!-- ADF : stationnaire -->
+<!-- Plot : pas de saisonalité, semble centrée -->
+<!-- ACF : 1 pic légèrement significatif en 10 (posssiblement un artefact) -->
+<!-- PACF : 1 pic légèrement significatif en 10 (posssiblement un artefact) -->
+<!-- Lag 1 : indpt -->
 
-Effectuons la même procédure avec la transformation Box-Cox.
+<!-- Normalité -->
+<!-- Shapiro : pas gaussien -->
+<!-- Histogramme : pas gaussien -->
+<!-- Q-Q plot : pas gaussien -->
 
-```{r}
-bc_trainset = BoxCox(trainset, lambda=-0.7)
-plot(bc_trainset)
-```
+<!-- On constate globalement que qu'il est possible d'obtenir des résidus bruit blanc. Cependant, ils ne semblent pas suivre une loi gaussienne. De plus, il possible que notre série soit légèrement hétéroscédastique. Des transformations telles que Box-Cox ou le passage au logarithme peuvent potentiellment atténuer voir corriger ce cela. -->
 
-Puis appliquons un auto.arima.
-```{r}
-model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE)
-model5
-```
-Tous les coefficients sont significatifs.
+<!-- ### Transformation de Box-Cox et logarithmique -->
 
-```{r}
-check_stat(model5$resid)
-```
+<!-- ```{r} -->
+<!-- log_trainset = ts(log(trainset), start=1, frequency = 7) -->
+<!-- autoplot(log_trainset) -->
+<!-- ``` -->
+<!-- On a réussi à bien réduire la variance. Voyons ce que disent les tests ADF et KPSS. -->
 
+<!-- ```{r} -->
+<!-- LogTS = log_trainset -->
+<!-- DLogTS1 = diff(LogTS) -->
+<!-- autoplot(DLogTS1) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- kpss.test(DLogTS1) -->
+<!-- adf.test(DLogTS1) -->
+<!-- ``` -->
+<!-- Les tests vont dans le sens de la stationnarité -->
 
-```{r}
-model6 = auto.arima(bc_trainset, d=1, D=1, allowdrift=TRUE, allowmean=TRUE)
-model6
-```
-Tous les coefs sont significatifs.
-
-```{r}
-check_stat(model6$residuals)
-```
-## Holt-Winters
-
-```{r}
-holt_winters = HoltWinters(trainset, seasonal="additive")
-plot(holt_winters)
-```
-```{r}
-check_stat(trainset - holt_winters$fitted[,1])
-```
-
-## Erreur de prédiction sur testset
-
-Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. 
-
-Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Le score utilisé pour comparer les modèles est la RMSE.
-
-```{r}
-n = length(testset)
-
-pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred
-
-models = c("decomp + SARIMA (d=0, D=1)",
-           "SARIMA (d=0, D=1)",
-           "SARIMA (d=1, D=1)",
-           "log + SARIMA (d=0, D=1)",
-           "log + SARIMA (d=1, D=1)",
-           "BoxCox + SARIMA (d=0, D=1)",
-           "Box-Cox + SARIMA (d=1, D=1)",
-           "Holt-Winters",
-           "testset")
-
-pred1 = forecast(model1, h=n)
-pred2 = forecast(model2, h=n)
-pred3 = forecast(model3, h=n, biasadj=TRUE, lambda = 0)
-pred4 = forecast(model4, h=n, biasadj=TRUE, lambda = 0)
-pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7)
-pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7)
-pred_hw = forecast(holt_winters, h=n)
-
-# plot(trainset, xlim=c(0,45))
-plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 70))
-lines(ts(pred0, frequency=7, start=c(41,1)), col="gray")
-lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue")
-lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red")
-lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple")
-lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange")
-lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown")
-lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="green")
-legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "green", "black"), lw=1, box.lty=0, cex = 0.60)
-```
-
-```{r}
-perf0 = cbind(type = models[1], getPerformance(as.vector(pred0), as.vector(testset)))
-perf1 = cbind(type = models[2], getPerformance(as.vector(pred1$mean), as.vector(testset)))
-perf2 = cbind(type = models[3], getPerformance(as.vector(pred2$mean), as.vector(testset)))
-perf3 = cbind(type = models[4], getPerformance(as.vector(pred3$mean), as.vector(testset)))
-perf4 = cbind(type = models[5], getPerformance(as.vector(pred4$mean), as.vector(testset)))
-perf5 = cbind(type = models[6], getPerformance(as.vector(pred5$mean), as.vector(testset)))
-perf6 = cbind(type = models[7], getPerformance(as.vector(pred6$mean), as.vector(testset)))
-perf_hw = cbind(type = models[8], getPerformance(as.vector(pred_hw$mean), as.vector(testset)))
-
-perf = rbind(perf0, perf1, perf2, perf3, perf4, perf5, perf6, perf_hw)
-
-list(perf[order(perf$RMSE), ], models[order(perf$RMSE)])
-```
-
-```{r}
-n = length(testset)
-
-pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred
-
-models = c("SARIMA (d=0, D=1)",
-           "log + SARIMA (d=0, D=1)",
-           "BoxCox + SARIMA (d=0, D=1)",
-           "testset")
-
-top1 = forecast(model1, h=n)
-top2 = forecast(model3, h=n, biasadj=TRUE, lambda = 0)
-top3 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7)
-
-# plot(trainset, xlim=c(0,45))
-plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 60))
-lines(ts(top1$mean, frequency=7, start=c(41,1)), col="blue")
-lines(ts(top2$mean, frequency=7, start=c(41,1)), col="red")
-lines(ts(top3$mean, frequency=7, start=c(41,1)), col="gray")
-legend("topleft", legend=models, col=c("blue", "red", "gray", "black"), lw=1, box.lty=0, cex = .8)
-```
-
-## Validation croisée
-
-Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. 
-
-Il est temps de comparer nous modèles sur des critères prédictifs.
-
-La procédure d'évaluation consiste en une validations croisées adaptées au série temporelle. L'image ci-dessus résume parfaitement l'idée.
-
-![](https://miro.medium.com/max/1204/1*qvdnPF8ETV9mFdMT0Y_BBA.png)
-
-Le score utilisé pour comparer les modèles est la RMSE.
+<!-- ```{r} -->
+<!-- acf(as.numeric(DLogTS1), lag.max=40) -->
+<!-- pacf(as.numeric(DLogTS1), lag.max=40) -->
+<!-- ``` -->
+<!-- Mais pas l'ACF où un motif périodique se dessine clairement. -->
+<!-- On voit néanmois qu'on a réussi à éliminer la tendance. -->
+<!-- Pour éliminer le motif périodique, essayons une différenciation d'ordre 7 -->
 
 
-## Erreur de prédiction en fonction de l'horizon
+<!-- Differenciation I-B⁷ -->
+<!-- ```{r} -->
+<!-- DLogTS2 = diff(LogTS,7) -->
+<!-- plot(DLogTS2) -->
+<!-- ``` -->
 
-lien : https://otexts.com/fpp3/tscv.html
+<!-- ```{r} -->
+<!-- kpss.test(DLogTS2) -->
+<!-- adf.test(DLogTS2) -->
+<!-- ``` -->
+<!-- Les tests vont dans le sens de la stationnarité -->
 
-## Conclusion
+<!-- ```{r} -->
+<!-- acf(as.numeric(DLogTS2), lag.max=40) -->
+<!-- pacf(as.numeric(DLogTS2), lag.max=40) -->
+<!-- ``` -->
+<!-- ACF : décroissance rapide avec un pic à 7 -->
+<!-- PACF : -->
+
+
+<!-- Differenciation (I-B)(I-B⁷) -->
+<!-- ```{r} -->
+<!-- DLogTS3 = diff(diff(LogTS,7)) -->
+<!-- plot(DLogTS3) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- kpss.test(DLogTS3) -->
+<!-- adf.test(DLogTS3) -->
+<!-- ``` -->
+<!-- Les tests vont dans le sens de la stationnarité -->
+
+<!-- ```{r} -->
+<!-- acf(as.numeric(DLogTS3), lag.max=40) -->
+<!-- pacf(as.numeric(DLogTS3), lag.max=40) -->
+<!-- ``` -->
+
+
+<!-- Conclusion : Il est judicieux de considérer les séries DLogTS2 et DLogTS dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries. -->
+
+
+<!-- ```{r} -->
+<!-- model3 = auto.arima(log_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE) -->
+<!-- model3 -->
+<!-- ``` -->
+<!-- Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle -->
+
+<!-- ```{r} -->
+<!-- plot(log_trainset) -->
+<!-- lines(model3$fitted,col='red') -->
+<!-- ``` -->
+<!-- Analyse des résidus du modèle. -->
+
+<!-- ```{r} -->
+<!-- check_stat(model3$residuals) -->
+<!-- ``` -->
+
+<!-- Deuxième modèle -->
+<!-- ```{r} -->
+<!-- model4 = auto.arima(log_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE) -->
+<!-- model4 -->
+<!-- ``` -->
+<!-- Tout les termes sont significatifs. -->
+
+<!-- Effectuons la même procédure avec la transformation Box-Cox. -->
+
+<!-- ```{r} -->
+<!-- bc_trainset = BoxCox(trainset, lambda=-0.7) -->
+<!-- plot(bc_trainset) -->
+<!-- ``` -->
+
+<!-- Puis appliquons un auto.arima. -->
+<!-- ```{r} -->
+<!-- model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE) -->
+<!-- model5 -->
+<!-- ``` -->
+<!-- Tous les coefficients sont significatifs. -->
+
+<!-- ```{r} -->
+<!-- check_stat(model5$resid) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- model6 = auto.arima(bc_trainset, d=1, D=1, allowdrift=TRUE, allowmean=TRUE) -->
+<!-- model6 -->
+<!-- ``` -->
+<!-- Tous les coefs sont significatifs. -->
+
+<!-- ```{r} -->
+<!-- check_stat(model6$residuals) -->
+<!-- ``` -->
+<!-- ## Holt-Winters -->
+
+<!-- ```{r} -->
+<!-- holt_winters = HoltWinters(trainset, seasonal="additive") -->
+<!-- plot(holt_winters) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- check_stat(trainset - holt_winters$fitted[,1]) -->
+<!-- ``` -->
+
+<!-- ## Erreur de prédiction sur testset -->
+
+<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
+
+<!-- Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Le score utilisé pour comparer les modèles est la RMSE. -->
+
+<!-- ```{r} -->
+<!-- n = length(testset) -->
+
+<!-- pred0 = forecast(model0, h=n)$mean + decomp(trainset, testset)$pred -->
+
+<!-- models = c("decomp + SARIMA (d=0, D=1)", -->
+<!--            "SARIMA (d=0, D=1)", -->
+<!--            "SARIMA (d=1, D=1)", -->
+<!--            "log + SARIMA (d=0, D=1)", -->
+<!--            "log + SARIMA (d=1, D=1)", -->
+<!--            "BoxCox + SARIMA (d=0, D=1)", -->
+<!--            "Box-Cox + SARIMA (d=1, D=1)", -->
+<!--            "Holt-Winters", -->
+<!--            "testset") -->
+
+<!-- pred1 = forecast(model1, h=n) -->
+<!-- pred2 = forecast(model2, h=n) -->
+<!-- pred3 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- pred4 = forecast(model4, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
+<!-- pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7) -->
+<!-- pred_hw = forecast(holt_winters, h=n) -->
+
+<!-- # plot(trainset, xlim=c(0,45)) -->
+<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 70)) -->
+<!-- lines(ts(pred0, frequency=7, start=c(41,1)), col="gray") -->
+<!-- lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue") -->
+<!-- lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red") -->
+<!-- lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple") -->
+<!-- lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange") -->
+<!-- lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown") -->
+<!-- lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="green") -->
+<!-- legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "green", "black"), lw=1, box.lty=0, cex = 0.60) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- perf0 = cbind(type = models[1], getPerformance(as.vector(pred0), as.vector(testset))) -->
+<!-- perf1 = cbind(type = models[2], getPerformance(as.vector(pred1$mean), as.vector(testset))) -->
+<!-- perf2 = cbind(type = models[3], getPerformance(as.vector(pred2$mean), as.vector(testset))) -->
+<!-- perf3 = cbind(type = models[4], getPerformance(as.vector(pred3$mean), as.vector(testset))) -->
+<!-- perf4 = cbind(type = models[5], getPerformance(as.vector(pred4$mean), as.vector(testset))) -->
+<!-- perf5 = cbind(type = models[6], getPerformance(as.vector(pred5$mean), as.vector(testset))) -->
+<!-- perf6 = cbind(type = models[7], getPerformance(as.vector(pred6$mean), as.vector(testset))) -->
+<!-- perf_hw = cbind(type = models[8], getPerformance(as.vector(pred_hw$mean), as.vector(testset))) -->
+
+<!-- perf = rbind(perf0, perf1, perf2, perf3, perf4, perf5, perf6, perf_hw) -->
+
+<!-- list(perf[order(perf$RMSE), ], models[order(perf$RMSE)]) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- n = length(testset) -->
+
+<!-- pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred -->
+
+<!-- models = c("SARIMA (d=0, D=1)", -->
+<!--            "log + SARIMA (d=0, D=1)", -->
+<!--            "BoxCox + SARIMA (d=0, D=1)", -->
+<!--            "testset") -->
+
+<!-- top1 = forecast(model1, h=n) -->
+<!-- top2 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- top3 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
+
+<!-- # plot(trainset, xlim=c(0,45)) -->
+<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 60)) -->
+<!-- lines(ts(top1$mean, frequency=7, start=c(41,1)), col="blue") -->
+<!-- lines(ts(top2$mean, frequency=7, start=c(41,1)), col="red") -->
+<!-- lines(ts(top3$mean, frequency=7, start=c(41,1)), col="gray") -->
+<!-- legend("topleft", legend=models, col=c("blue", "red", "gray", "black"), lw=1, box.lty=0, cex = .8) -->
+<!-- ``` -->
+
+<!-- ## Validation croisée -->
+
+<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
+
+<!-- Il est temps de comparer nous modèles sur des critères prédictifs. -->
+
+<!-- La procédure d'évaluation consiste en une validations croisées adaptées au série temporelle. L'image ci-dessus résume parfaitement l'idée. -->
+
+<!-- ![](https://miro.medium.com/max/1204/1*qvdnPF8ETV9mFdMT0Y_BBA.png) -->
+
+<!-- Le score utilisé pour comparer les modèles est la RMSE. -->
+
+
+<!-- ## Erreur de prédiction en fonction de l'horizon -->
+
+<!-- lien : https://otexts.com/fpp3/tscv.html -->
+
+<!-- ## Conclusion -->

@@ -1,5 +1,5 @@
 library(MLmetrics)
-
+help(MLmetrics)
 decomp = function(trainset, testset){
   n1 = length(trainset)
   n2 = length(testset)

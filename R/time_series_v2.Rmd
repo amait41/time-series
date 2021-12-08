@@ -18,13 +18,13 @@ source(file = "functions.R")
 
 => Intro sur les séries temporelles
 
-L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise angevine de livraison de repas à domicile, Frères Toque. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
+L'objet d'étude de ce projet est une série temporelle décrivant le nombre de commandes par jour d'une entreprise de livraison de repas à domicile. Cette série est découpée en un jeu d'entrainement (train set) de 280 observations et un jeu de test (test set) de 21 observations. Chargeons les données, divisons le jeu de données et affichons notre train set.
 
 ```{r}
 data = read.csv('orders.csv')
 trainset = ts(data$n_orders[1:280], frequency=7)
 testset = ts(data$n_orders[281:308], frequency=7)
-plot(trainset, type='l')
+plot(trainset, type='l', ylab="# commandes")
 ```
 
 ```{r}
