@@ -1,13 +1,16 @@
 ---
 title: "Série Chronologique - Projet"
 output:
-  pdf_document: default
-  html_notebook: 
+  pdf_document: 
     toc: yes
-    code_folding: hide
+    fig_width: 7
+    fig_height: 4
+    fig_caption: yes
+    number_sections: yes
+    keep_tex: yes
 ---
 
-```{r}
+```{r warning=FALSE, results='hide'}
 library(TSA)
 library(tseries)
 library(forecast)
@@ -33,7 +36,7 @@ Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre d
 
 La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
 
-```{r fig.width = 15, fig.height=5}
+```{r, fig.width = 15}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 # Segmentation
 t1 = 1:126; X1 = trainset[t1]
@@ -96,7 +99,7 @@ Il semble y avoir une légère sésonalité dans les résidus.
 En plus de l'aspect visuel, les tests suivants permettent d'évaluer l'hypothèse de stationarité :<br>
 - ADF avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus non stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
 - KPSS avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
-```{r}
+```{r, results="hide}
 res_decomp = decomposition$random[which(!is.na(decomposition$random))]
 adf.test(res_decomp)
 kpss.test(res_decomp)
@@ -112,7 +115,7 @@ Présentons maintenant deux outils indispensable à l'étude des processus ARMA:
 - L'AFC représente les autocorrélation entre deux valeurs distantes de $h$ dans le temps. Une autocorrélation nulle à partir d'un rang $q+1$ est caractéristique d'un processus $MA(q)$.<br>
 - L'autocorrélogramme PAFC représente quand à lui les corrélation "pur" entre deux valeurs distantes de $h$ dans le temps, c'est à dire entre lesquelles on a supprimé l'influence linéaire des valeurs intermédiaires. Une PACF avec des pics dans le couloir de non-significativité à partir du rang $p+1$ est caractéristique d'un processus $AR(p)$.
 
-De plus, on justifie 
+De plus, on justifie une tentative de modélisation par un processus $ARMA$ lorsque
 
 ```{r fig.width = 15, fig.height=5, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
