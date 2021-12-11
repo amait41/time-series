@@ -25,47 +25,53 @@ decomp = function(trainset, testset){
   list("train"=train_trend+train_seasonal, "pred"=pred_trend+pred_seasonal)
 }
 
-checkupRes = function(Res){
-  
+plot_checkup_res = function(Res){
   # Partitionnement de la fenêtre graphique 
   layout(matrix(c(1,1,1,2:7), nrow=3, ncol=3, byrow=TRUE))
-  plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
+  par(mar = c(2.2, 2.8, 2.2, 2.2))
+  # plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
   
   # Série des résidus
-  plot(Res,type='l', xlab = 'Time', ylab = 'Residuals')
+  plot(Res,type='l', xlab='', ylab='', main="Analyse des incréments")
   
-  # ACF/PACF
-  acf(Res, main="")
-  pacf(Res, main="")
+  # ACF
+  acf(Res, xlab="", ylab="", main="ACF")
+  
+  # PACF
+  pacf(Res, xlab="", ylab="", main="Partial ACF")
   
   # Nuage de points avec décalage de 1 dans le temps
   Res_aux = c()
-  
   for (j in 1:length(Res)){
     Res_aux[j] = Res[j-1]
   }
-  plot(Res_aux,Res,col='blue', xlab = expression(epsilon[t-1]), ylab = expression(epsilon[t]))
+  plot(Res_aux, Res,col='blue', main="Lag 1", xlab="", ylab="") #ab = expression(epsilon[t-1]), ylab = expression(epsilon[t]))
   
   # Histogramme
-  hist(Res, freq=FALSE, breaks=30, col='lightblue', xlab = 'Residuals')
+  hist(Res, freq=FALSE, breaks=30, col='lightblue', main="Histogramme", xlab = 'Residuals')
   curve(dnorm(x, m=mean(Res), sd=sd(Res)), col="red", lty=2, add=TRUE)
   
   # QQ plots  -> c'est une droite pour les gaussiennes
-  qqnorm(Res,col='blue')
+  qqnorm(Res, col='blue', main="Q-Q Plot")
   qqline(Res)
   
   # Nuage de points standardisé
-  plot((Res-mean(Res))/sd(Res),col='blue',ylab = 'Normalized residuals', xlab = 'Time')
-  abline(a=1.96,b=0,col='red')
-  abline(a=-1.96,b=0,col='red')
+  plot((Res-mean(Res))/sd(Res),col='blue', main="Résidus normalisés", ylab = '', xlab = '')
+  abline(a=1.96, b=0, col='red')
+  abline(a=-1.96, b=0, col='red')
 }
 
-check_stat = function(res){
-  checkupRes(res[which(!is.na(res))])
-  print(Box.test(res, type="Ljung-Box", lag=7))
+test_res = function(res){
+  print(adf.test(res))
   print(kpss.test(res))
-  print(adf.test(res[which(!is.na(res))]))
+  print(Box.test(res, type="Ljung-Box", lag=7))
   print(shapiro.test(res))
+}
+
+check_res = function(res){
+  res = res[which(!is.na(res))]
+  plot_checkup_res(res)
+  test_res(res)
 }
 
 evaluate = function(model, trainset){

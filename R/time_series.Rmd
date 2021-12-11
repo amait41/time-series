@@ -10,8 +10,8 @@ output:
     keep_tex: yes
 ---
 
-```{r warning=FALSE, results='hide'}
-library(TSA)
+```{r warning=FALSE, echo=FALSE, results='hide'}
+# library(TSA)
 library(tseries)
 library(forecast)
 source(file = "functions.R")
@@ -36,7 +36,7 @@ Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre d
 
 La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
 
-```{r, fig.width = 15}
+```{r,  echo=FALSE, fig.width=15, fig.height=4}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 # Segmentation
 t1 = 1:126; X1 = trainset[t1]
@@ -45,6 +45,9 @@ t3 = 247:280; X3 = trainset[t3]
 lm1 = lm(X1~t1)
 lm2 = lm(X2~t2)
 lm3 = lm(X3~t3)
+# print(summary(lm1))
+# print(summary(lm2))
+# print(summary(lm3))
 plot(t1, X1, type='l', xlab="Index", ylab="# commandes", main="Segmentation de la série temporelle", xlim=c(0,length(trainset)))
 lines(t2, X2, type="l", col="blue")
 lines(t3, X3, type="l", col="red")
@@ -53,25 +56,37 @@ lines(t2, lm2$coefficients[1]+ t2 * lm2$coefficients[2], col="blue")
 lines(t3, lm3$coefficients[1]+ t3 * lm3$coefficients[2], col="red")
 
 # Saisonalité
+help(seasonplot)
 seasonplot(trainset, type="l", main="Graphique saisonnier", xlab="Jour", ylab="# commandes", season.labels=c("Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"))
 ```
 
-Les modèles $ARMA$ font l'hypothèse que la série temporelle est stationnaire (du second ordre), c'est à dire que sa moyenne et sa covariance sont invariantes par translation dans le temps. Pour rendre cette série stationnaire, nous allons utiliser plusieurs approches telles que la décomposition (partie 2) et la différentiation (partie 3). Puis nous établirons des modèles de la famille $ARIMA$ à l'aide de la fonction `auto.arima` et `checkup_res` (partie 3) avant d'évaluer nos modèles sur le jeu de données test avec des critères prédictifs  (partie 4).
+Les modèles $ARMA$ font l'hypothèse que la série temporelle est stationnaire (du second ordre), c'est à dire que sa moyenne et sa covariance sont invariantes par translation dans le temps. Pour rendre cette série stationnaire, nous allons utiliser plusieurs approches telles que la décomposition (partie 2) et la différentiation (partie 3). Puis nous établirons des modèles de la famille $ARIMA$ à l'aide de la fonction `auto.arima` et `checkup_res` (partie 3) avant d'évaluer nos modèles sur le jeu de donnée test avec des critères prédictifs (partie 4).
 
 # Décomposition
 
-Afin de valider cette hypothèse, il est possible d'appliquer la procédure suivante. On élimine dans un premier temps la composante saisonière en appliquant sur la série un opérateur moyenne mobile $M_m(B) = \frac{1}{2m+1} \sum\limits_{n=1}^{m} B^{-k}$ avec $B$ l'opérateur de retard tel que $B^kX_t=X_{t-k}$. Puis on estime par régression la tendance sur la série filtrée. Enfin, on estime la composante saisonnière en effectuant la moyenne des périodes et en la dupliquant autant de fois que nécéssaire.
+Afin de valider cette hypothèse, il est possible d'appliquer la procédure suivante. Dans un premier temps, on applique sur la série un opérateur moyenne mobile $M_m(B) = \frac{1}{2m+1} \sum\limits_{n=1}^{m} B^{-k}$  qui élimine  les tendances $\tau$-périodiques avec $B$ l'opérateur de retard tel que $B^kX_t=X_{t-k}$. Puis, on estime par régression la tendance sur la série filtrée. Enfin, on estime la composante saisonnière en effectuant la moyenne des périodes et en dupliquant ce résultat autant de fois que nécéssaire. On obtient la décomposition ci-dessous.
 
-```{r, fig.width = 8, fig.height=5, echo=FALSE}
-layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+```{r, fig.width=7, fig.height=5, echo=FALSE}
 decomposition = decompose(trainset)
-plot(decomposition)
+# plot(decomposition)
+
+decomp.plot2 <- function(x, main)
+{
+    if(missing(main))
+	main <- paste("Decomposition of", x$type, "time series")
+    plot(cbind(observed = x$random + if (x$type == "additive")
+        x$trend + x$seasonal
+    else x$trend * x$seasonal, trend = x$trend, seasonal = x$seasonal,
+        random = x$random), main = main)
+}
+decomp.plot2(decomposition, main="Décomposition additive de la série")
 # decomposition_stl = stl(trainset, s.window=7)
 # plot(decomposition_stl)
 ```
 Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une regression linéaire sur la tendance puis y ajouter la composante saisonnière.
 
-```{r, fig.width = 6, fig.height=3, echo=FALSE}
+```{r, fig.width = 12, fig.height=4, echo=FALSE, warning=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 t = 1:length(decomposition$trend)
 t2 = t^2
 t3 = t^3
@@ -81,25 +96,28 @@ reg_lin2 = lm(decomposition$trend ~ t + t2)
 reg_lin3 = lm(decomposition$trend ~ t + t2 + t3)
 reg_lin4 = lm(decomposition$trend ~ t + t2 + t3 + t4)
 
-plot(t, as.numeric(decomposition$trend), type="l", lwd=1.5, main="Regression sur la tendance", ylab="Tendance", xlab="Temps")
+plot(t, as.numeric(decomposition$trend), type="l", lwd=1.5, main="Regression sur la tendance", ylab="decomp$trend", xlab="Temps")
 lines(reg_lin1$fitted.values, type="l")
 lines(reg_lin2$fitted.values, type="l", col="blue")
 lines(reg_lin3$fitted.values, type="l", col="red")
 lines(reg_lin4$fitted.values, type="l", col="green")
 legend("topright", legend=c("ordre 1", "ordre 2", "ordre 3", "ordre 4"), col=c("black", "blue", "red", "green"), lw=1)
+
+decomp_ = decomp(trainset, testset)
+plot(decomp_$train, main="Régression + composante saisonière", xlab="Périodes", ylab="decomp$trend + decomp$seasonal")
 ```
 Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat avec un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garder la régression linéaire d'ordre 3. Analysons à présent les résidus de la décomposition.
 
-```{r, fig.width = 8, fig.height=5, echo=FALSE, warning=FALSE}
-decomp_ = decomp(trainset, testset)
-plot(decomposition$random, ylab="", xlab="Période", main="Résidus")
+```{r, fig.width=8, fig.height=4, echo=FALSE, warning=FALSE}
+plot(decomposition$random, ylab="", xlab="Période", main="Résidus de la décomposition")
 ```
 Il semble y avoir une légère sésonalité dans les résidus.
 
 En plus de l'aspect visuel, les tests suivants permettent d'évaluer l'hypothèse de stationarité :<br>
 - ADF avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus non stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
 - KPSS avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
-```{r, results="hide}
+
+```{r, results="hide", echo=FALSE}
 res_decomp = decomposition$random[which(!is.na(decomposition$random))]
 adf.test(res_decomp)
 kpss.test(res_decomp)
@@ -108,27 +126,25 @@ kpss.test(res_decomp)
 |------|-------------|---------|
 | ADF  | -12.135     | <0.01   |
 | KPSS | 0.020884    | >0.1    |
+<!-- |------------------------------| -->
+<!-- |<center>>Tests de stationarités</center> -->
 
-Les tests s'accordent. En effet, le test ADF rejette l'hypothèse de non stationarité (p-value<<0.05) alors que le test KPSS ne rejette pas l'hypothèse de stationarité (p-value>>0.05). Nous avons donc obtenu des résidus stionnaires d'après ces tests.
+Les tests s'accordent. Le test ADF rejette l'hypothèse de non stationarité (p-value<<0.05) alors que le test KPSS ne rejette pas l'hypothèse de stationarité (p-value>>0.05). Nous avons donc obtenu des résidus stionnaires d'après ces tests.
 
 Présentons maintenant deux outils indispensable à l'étude des processus ARMA: l'ACF et la PAFC:<br>
 - L'AFC représente les autocorrélation entre deux valeurs distantes de $h$ dans le temps. Une autocorrélation nulle à partir d'un rang $q+1$ est caractéristique d'un processus $MA(q)$.<br>
 - L'autocorrélogramme PAFC représente quand à lui les corrélation "pur" entre deux valeurs distantes de $h$ dans le temps, c'est à dire entre lesquelles on a supprimé l'influence linéaire des valeurs intermédiaires. Une PACF avec des pics dans le couloir de non-significativité à partir du rang $p+1$ est caractéristique d'un processus $AR(p)$.
 
-De plus, on justifie une tentative de modélisation par un processus $ARMA$ lorsque
+De plus, on justifie une tentative de modélisation par un processus $ARMA$ lorsque la série est considérée comme stationnaire et que ses ACF et PACF empiriques montrent une décroissance rapide.
 
-```{r fig.width = 15, fig.height=5, echo=FALSE}
+```{r fig.width=12, fig.height=4, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(res_decomp, main="")
 pacf(res_decomp, main="")
 ```
-L'ACF présente des pics périodiques majoritairement significatifs avec une faible décroissance. On observe une corrélation élevée pour les lag multiple de 7. On ne peut donc pas conclure que la série est stationnaire car elle possède une composante saisonnière.
-
-La PACF possède des corrélations partielles significatives aux lags 1 à 6. Ainsi, il est possible de penser que le nombre de livraisons est corrélé significativement au nombre de commandes lors de la semaine passée ainsi qu'au nombre de commande réalisée 14 jours auparavant.
+L'ACF présente des pics périodiques majoritairement significatifs avec une faible décroissance. On observe une corrélation élevée pour les lag multiple de 7. La PACF possède des corrélations partielles significatives aux lags 1 à 6. Ainsi, il est clair que nous encore avons une saisonalité d'ordre 7.
 
 En conclusion, les résidus du modèle de decomposition ne sont pas stationnaires et présentent une saisonalité d'ordre 7.
-
-
 
 <!-- A mettre après ARIMA -->
 
@@ -141,22 +157,43 @@ En conclusion, les résidus du modèle de decomposition ne sont pas stationnaire
 
 # Différenciation
 
-<!-- Introduisons l'opérateur de retard $B$ qui à une donnée chronologique donnée lui associe sa valeur précédante. On a alors $B^0X_t=IX_t=X_t$, $B^kX_t=X_{t-k}$ et $B^{-k}X_t = X_{t+k}$. -->
+## Différentiation simple
 
-Différencier une série temporelle à l'ordre $d$ consiste à lui appliquer le filtre $(I-B^d)$. On regarde alors si $\Delta X_t = (I-B^d)X_t$ est stationnaire.
+Afin de rendre une série stationnaire, il est possible d'intégrer cette dernière en lui appliquant un filtre de la forme $(I-B)$.  On regarde alors si $\Delta X_t = (I-B)X_t$ est stationnaire.
 
-### Différenciation sur les résidus de la décomposition
+Cette méthodes ne donne pas de résultats satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
 
-```{r}
-diff_decompose = diff(decomp_residuals, 7)
-check_stat(diff_decompose)
+Les tests de stationarité nous incitent à penser que la série différanciée $(\Delta X_t)$ n'est pas stationnaire.
+```{r, echo=FALSE, results='hide'}
+diff1 = diff(trainset, lag=1)
+adf.test(diff1)
+kpss.test(diff1)
 ```
+| Test      | Statistique | p-value   |
+|-----------|-------------|-----------|
+| ADF       | -11.875     | <0.01     |
+| KPSS      | 0.06673     | >0.1      |
+<!-- | Ljung-Box | 241.24      | 2.2e-16   | -->
+<!-- | Shapiro   | 0.97117     | 2.598e-05 | -->
 
-### Différenciation sur la série original
+L'ACF et la PACF présentent repectivement des autocorrélationS très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
+
+```{r fig.width=12, fig.height=4, echo=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+acf(diff1, main="")
+pacf(diff1, main="")
+```
+Nous devons conclure que les incréments ne sont pas stationnaires. De plus, l'application d'un filtre $(I-B^s)$ sur la série semble tout indiqué au vue de la saisonalité apparante.
+
+## Différentiation saisonnière
+
+La différentiation saisonnière consiste à appliquer un filtre de la forme $(I-B^s)$ à notre série. On obtient alors les incréments saisonniers $(\Delta_s X_t = (I-B^s)X_t)$.
+
 
 ```{r}
-diff1 = diff(trainset)
-check_stat((diff1))
+diff7 = diff(trainset, lag=7)
+adf.test(diff7)
+kpss.test(diff7)
 ```
 
 Les tests KPSS et ADF obtiennent des p-value respective supérieur à 0.1 et inférieur à 0.01. On pourrait alors penser que cette série est stationnaire. Néanmoins cette différenciation n'est pas concluante car:
