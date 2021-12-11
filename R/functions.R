@@ -32,7 +32,7 @@ plot_checkup_res = function(Res, title){
   # plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
   
   # Série des résidus
-  plot(Res,type='l', xlab='', ylab='', main=title)
+  plot(Res,type='l', xlab='', ylab='', xaxt='n', main=title)
   
   # ACF
   acf(Res, xlab="", ylab="", main="ACF")
