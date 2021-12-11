@@ -146,15 +146,6 @@ L'ACF présente des pics périodiques majoritairement significatifs avec une fai
 
 En conclusion, les résidus du modèle de decomposition ne sont pas stationnaires et présentent une saisonalité d'ordre 7.
 
-<!-- A mettre après ARIMA -->
-
-<!-- De manière général, lorsque l'on souhaite modéliser une série temporelle, on applique un modèle pour tenter d'obtenir des résidus centrés et de même variance finie aussi appellé *bruit blanc*. Ainsi, on s'appuie en particulier sur le test l'auto-corrélation de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "la série temporelle ne possède pas d'autocorrélation". -->
-
-<!-- ```{r} -->
-<!-- Box.test(trainset, type="Ljung-Box") -->
-<!-- ``` -->
-<!-- En ce qui concerne notre série temporelle, on rejette fortement cette hypothèse avec une p-value. -->
-
 # Différenciation
 
 ## Différentiation simple
@@ -163,8 +154,9 @@ Afin de rendre une série stationnaire, il est possible d'intégrer cette derni�
 
 Cette méthodes ne donne pas de résultats satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
 
-Les tests de stationarité nous incitent à penser que la série différanciée $(\Delta X_t)$ n'est pas stationnaire.
-```{r, echo=FALSE, results='hide'}
+Les tests de stationarité nous incitent à penser que la série différanciée $(\Delta X_t)$ est pas stationnaire.
+
+```{r, echo=FALSE, results='hide', warning=FALSE}
 diff1 = diff(trainset, lag=1)
 adf.test(diff1)
 kpss.test(diff1)
@@ -176,92 +168,188 @@ kpss.test(diff1)
 <!-- | Ljung-Box | 241.24      | 2.2e-16   | -->
 <!-- | Shapiro   | 0.97117     | 2.598e-05 | -->
 
-L'ACF et la PACF présentent repectivement des autocorrélationS très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
+Néanmoins, l'ACF et la PACF présentent repectivement des autocorrélationS très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
 
-```{r fig.width=12, fig.height=4, echo=FALSE}
+```{r, fig.width=12, fig.height=4, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(diff1, main="")
 pacf(diff1, main="")
 ```
-Nous devons conclure que les incréments ne sont pas stationnaires. De plus, l'application d'un filtre $(I-B^s)$ sur la série semble tout indiqué au vue de la saisonalité apparante.
+Nous devons conclure que les incréments ne sont pas stationnaires car ils contients encore une composante saisonnière.
 
 ## Différentiation saisonnière
 
-La différentiation saisonnière consiste à appliquer un filtre de la forme $(I-B^s)$ à notre série. On obtient alors les incréments saisonniers $(\Delta_s X_t = (I-B^s)X_t)$.
+.La différentiation saisonnière consiste à appliquer un filtre de la forme $(I-B^s)$ à notre série. On obtient alors les incréments saisonniers $(\Delta_s X_t = (I-B^s)X_t)$. L'application de ce filtre sur la série semble tout indiqué car il élimine les tendances s-périodique. Les tests ADF et KPPSS s'accordent sur l'hypothèse de stationarité. 
 
+| Test      | Statistique | p-value   |
+|-----------|-------------|-----------|
+| ADF       | -11.875     | <0.01     |
+| KPSS      | 0.06673     | >0.1      |
 
-```{r}
+```{r,  echo=FALSE, warning=FALSE}
 diff7 = diff(trainset, lag=7)
 adf.test(diff7)
 kpss.test(diff7)
 ```
+L'ACF montre une décroissance rapide avec des pics significatifs en 1, 4 et 7. La PACF possède aussi une décroissance rapide et des pics significatifs en 1 et 7. On pourra alors tenter une modélisation $ARMA$ sur la série $Y_t = \Delta_7 X_t = (I-B^7) X_t$.
 
-Les tests KPSS et ADF obtiennent des p-value respective supérieur à 0.1 et inférieur à 0.01. On pourrait alors penser que cette série est stationnaire. Néanmoins cette différenciation n'est pas concluante car:
-- On observe une saisonalité de la série graphiquement
-- L'ACF montre aussi un saisonalité avec des pics très significatifs en 7, 14 et 21.
-- La PACF montre des pics de plus en plus significatifs jusqu'à 7.
-- Le graphique des obsrvations $X_t$ en fonction de $X_t-1$ montre visuellement une 
-- Enfin, l'histogramme, le Q-Q plot, le graphique des residus normalisés ainsi que le test de shapiro donne la série non gaussienne.
+```{r, fig.width=12, fig.height=4, echo=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+acf(diff7, lag=40)
+pacf(diff7, lag=40)
+```
+Essayons de différencier à nouveau la série, c'est à dire d'appliquer le filtre $(I-B)(I-B^7)$ sur la série.
 
-Passons alors à une différentiation d'ordre 7.
+Les tests vont encore dans le sens de la stationnarité.
+
+| Test      | Statistique | p-value   |
+|-----------|-------------|-----------|
+| ADF       | -11.875     | <0.01     |
+| KPSS      | 0.06673     | >0.1      |
+
+```{r,  echo=FALSE, warning=FALSE}
+ddiff7 = diff(diff(trainset, lag=7))
+adf.test(ddiff7)
+kpss.test(ddiff7)
+```
+L'ACF et la PACF donnent de moins bon résultat dans le sens où l'ACF donne des résultats similaires mais la PACF décroit beaucoup moins vite et possède d'avantage de pics significatifs.
+
+```{r, fig.width=12, fig.height=4, echo=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+acf(ddiff7, lag=40)
+pacf(ddiff7, lag=40)
+```
+Conclusion, la série différenciée avec le filtre $(I-B^7)$ remplie le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)(P,D,Q)_7$ avec $(d,D)=(0,1)$.
+
+# Modélisation
+
+Nous avons vu dans la partie précédante qu'une différanciation d'ordre 1 avec le filtre $(I-B^7)$ donne une série stationnaire. Cela motive l'idée d'appliquer un modèle $SARIMA(p,0,q)\times(Q,1,P). Nous déterminons les coefficients p, q, Q et P avec la méthode `auto.arima`. Il est important d'effectuer la recherche du meilleur modèle avec les paramètres `allowdrift=TRUE` et `include.mean=TRUE` car la différanciation effectuée élimine totalement les tendance d'ordre 1. Le résultat de la recherche est présenté ci-dessous:
+
+```{r, echo=FALSE}
+model1 = auto.arima(trainset, d=0, D=1, allowdrift=TRUE, include.mean=TRUE)
+model1
+```
+Pour estimer la pertinance du modèle et en particulier la significativité d'un coefficient, on divise la valeurs de ce derniers par son écart type. Le quotient doit se trouver hors de l'intervalle $[-1.96, 196]$ afin que le paramètre soit considéré comme significatif. Les coefficients ma4, sar1 et drift non sont pas significatifs. Testons alors le modèle $SARIMA(3,0,3)(0,1,1)_7$ sans tendance linéaire.
 
 ```{r}
-diff2 = diff(trainset, 7)
-check_stat(diff2)
+model1 = Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE)
+model1
 ```
-Les tests ADF et KPPSS vont dans le sens de la stationnarité. L'ACF montre une décroissance rapide avec une légère périodicité et des pics significatifs en 4 et 7. La PACF possède des pics significatifs en 4, 7, 8 et 11 avec une légère périodicité.
-On retrouve une série dont l'allure est en accord avec la stationnarité. Néanmoins les graphiques et les tests montre que cette différanciation ne donne pas une série probablement gausienne.
+Les coefficients sont tous significatifs. Le score BIC obtenu pour ce modèle est de 1702,45.
 
-Essayons de différencier à nouveau la série, c'est à dire d'appliquer le filtre $(I-B)(I-B^7)$ à $X_t$.
+Pour considérer que le modèle est bon, les résidus doivent former si possible un bruit blanc. Autrement dit, les résidus réduits doivent être stationnaires, centrés, indépendants et suivre une loi normale. Pour ce faire nous utilisons différants outils statistiques tels que les tests ADF et KPSS présentés précédamment ainsi que les tests de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "La série temporelle ne possède pas d'autocorrélation." et de Shapiro d'hypothèse nulle $\mathcal{H_0}$ : "L'échantillon suit une loi normale."
 
-```{r}
-diff3 = diff(diff(trainset,7))
-check_stat(diff3)
-```
-Les tests vont dans le sens de la stationnarité. L'ACF et la PACF donnent de moins bon résultat dans le sens où il y a respectivement au moins 6 pics significatifs dont certains aù delà de 10. La série ne semble toujours suivre une loi gaussienne.
+| Test      | Statistique | p-value   |
+|-----------|-------------|-----------|
+| ADF       | -11.875     | <0.01     |
+| KPSS      | 0.06673     | >0.1      |
+| Ljung-Box | -11.875     | <0.01     |
+| Shapiro   | 0.06673     | >0.1      |
 
-Conclusion, les séries différenciées avec les filtres $(I-B^7)$ et $(I-B)(I-B^7)$ remplissent le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)\times(P,D,Q)_7$ avec $(d,D)=(0,1)$ ou $(d,D)=(1,1)$.
-
-## Modélisation
-
-=> Définition du modèle à développper avec un exemple.
-
-En pratique, on détermine les coefficients avec la méthode auto.arima.
-
-```{r}
-model = auto.arima(trainset, allowmean=TRUE, allowdrift=TRUE)
-model
+```{r, warning=FALSE, echo=FALSE}
+check_res(model1$residuals, "Analyse de résidus : SARIMA(3,0,3)(0,1,1)[7]")
 ```
 
-=> Détails : Tous les termes sont significatifs. On obtient un score BIC de 1796.31.
 
-```{r}
-plot(trainset)
-lines(model$fitted, col='red')
-```
-Visuellement, le modèle s'adapte relativement bien aux données. Analysons les résidus de ce premier modèle.
+<!-- ## Erreur de prédiction sur testset -->
 
-```{r}
-check_stat(model$residuals)
-```
-Pour considérer que le modèle est bon, les résidus doivent former un bruit blanc. Cela se décline en en deux partie.
+<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
 
-#### Stationarité des résidus
-Box-Ljung : bb au risque de 5%
-KPSS : pas non-stationnaire
-ADF : stationnaire
-Plot : ras
-ACF : pas de pics significatifs
-PACF : pas de pics significatifs
-Lag 1 : indpt
+<!-- Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Le score utilisé pour comparer les modèles est la RMSE. -->
 
-#### Normalité des résidus
-Shapiro : pas gaussien
-Histogramme : pas gaussien
-Q-Q plot : pas gaussien
+<!-- ```{r} -->
+<!-- n = length(testset) -->
+
+<!-- pred0 = forecast(model0, h=n)$mean + decomp(trainset, testset)$pred -->
+
+<!-- models = c("decomp + SARIMA (d=0, D=1)", -->
+<!--            "SARIMA (d=0, D=1)", -->
+<!--            "SARIMA (d=1, D=1)", -->
+<!--            "log + SARIMA (d=0, D=1)", -->
+<!--            "log + SARIMA (d=1, D=1)", -->
+<!--            "BoxCox + SARIMA (d=0, D=1)", -->
+<!--            "Box-Cox + SARIMA (d=1, D=1)", -->
+<!--            "Holt-Winters", -->
+<!--            "testset") -->
+
+<!-- pred1 = forecast(model1, h=n) -->
+<!-- pred2 = forecast(model2, h=n) -->
+<!-- pred3 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- pred4 = forecast(model4, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
+<!-- pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7) -->
+<!-- pred_hw = forecast(holt_winters, h=n) -->
+
+<!-- # plot(trainset, xlim=c(0,45)) -->
+<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 70)) -->
+<!-- lines(ts(pred0, frequency=7, start=c(41,1)), col="gray") -->
+<!-- lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue") -->
+<!-- lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red") -->
+<!-- lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple") -->
+<!-- lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange") -->
+<!-- lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown") -->
+<!-- lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="green") -->
+<!-- legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "green", "black"), lw=1, box.lty=0, cex = 0.60) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- perf0 = cbind(type = models[1], getPerformance(as.vector(pred0), as.vector(testset))) -->
+<!-- perf1 = cbind(type = models[2], getPerformance(as.vector(pred1$mean), as.vector(testset))) -->
+<!-- perf2 = cbind(type = models[3], getPerformance(as.vector(pred2$mean), as.vector(testset))) -->
+<!-- perf3 = cbind(type = models[4], getPerformance(as.vector(pred3$mean), as.vector(testset))) -->
+<!-- perf4 = cbind(type = models[5], getPerformance(as.vector(pred4$mean), as.vector(testset))) -->
+<!-- perf5 = cbind(type = models[6], getPerformance(as.vector(pred5$mean), as.vector(testset))) -->
+<!-- perf6 = cbind(type = models[7], getPerformance(as.vector(pred6$mean), as.vector(testset))) -->
+<!-- perf_hw = cbind(type = models[8], getPerformance(as.vector(pred_hw$mean), as.vector(testset))) -->
+
+<!-- perf = rbind(perf0, perf1, perf2, perf3, perf4, perf5, perf6, perf_hw) -->
+
+<!-- list(perf[order(perf$RMSE), ], models[order(perf$RMSE)]) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- n = length(testset) -->
+
+<!-- pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred -->
+
+<!-- models = c("SARIMA (d=0, D=1)", -->
+<!--            "log + SARIMA (d=0, D=1)", -->
+<!--            "BoxCox + SARIMA (d=0, D=1)", -->
+<!--            "testset") -->
+
+<!-- top1 = forecast(model1, h=n) -->
+<!-- top2 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
+<!-- top3 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
+
+<!-- # plot(trainset, xlim=c(0,45)) -->
+<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 60)) -->
+<!-- lines(ts(top1$mean, frequency=7, start=c(41,1)), col="blue") -->
+<!-- lines(ts(top2$mean, frequency=7, start=c(41,1)), col="red") -->
+<!-- lines(ts(top3$mean, frequency=7, start=c(41,1)), col="gray") -->
+<!-- legend("topleft", legend=models, col=c("blue", "red", "gray", "black"), lw=1, box.lty=0, cex = .8) -->
+<!-- ``` -->
+
+<!-- ## Validation croisée -->
+
+<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
+
+<!-- Il est temps de comparer nous modèles sur des critères prédictifs. -->
+
+<!-- La procédure d'évaluation consiste en une validations croisées adaptées au série temporelle. L'image ci-dessus résume parfaitement l'idée. -->
+
+<!-- ![](https://miro.medium.com/max/1204/1*qvdnPF8ETV9mFdMT0Y_BBA.png) -->
+
+<!-- Le score utilisé pour comparer les modèles est la RMSE. -->
 
 
-<!-- # Annexe 1 -->
+<!-- ## Erreur de prédiction en fonction de l'horizon -->
+
+<!-- lien : https://otexts.com/fpp3/tscv.html -->
+
+<!-- ## Conclusion -->
+
+
+# Annexe 1
 
 <!-- ```{r} -->
 <!-- model0 = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE) -->
@@ -274,12 +362,11 @@ Q-Q plot : pas gaussien
 <!-- lines(model0$fitted, col="red") -->
 <!-- ``` -->
 
-
 <!-- ```{r} -->
 <!-- check_stat(model0$residuals) -->
 <!-- ``` -->
 
-<!-- Néanmoins, pour plus de concisions nous allons n'effectuer ici uniquement l'analyse des résidus pour ce premier modèle. L'analyse détaillée est en Annexe 1. Le tableau ci dessous résume l'analyse des résidus des différants modèles. -->
+# Annexe 2
 
 <!-- ```{r} -->
 <!-- model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE) -->
@@ -488,100 +575,3 @@ Q-Q plot : pas gaussien
 <!-- ```{r} -->
 <!-- check_stat(trainset - holt_winters$fitted[,1]) -->
 <!-- ``` -->
-
-<!-- ## Erreur de prédiction sur testset -->
-
-<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
-
-<!-- Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Le score utilisé pour comparer les modèles est la RMSE. -->
-
-<!-- ```{r} -->
-<!-- n = length(testset) -->
-
-<!-- pred0 = forecast(model0, h=n)$mean + decomp(trainset, testset)$pred -->
-
-<!-- models = c("decomp + SARIMA (d=0, D=1)", -->
-<!--            "SARIMA (d=0, D=1)", -->
-<!--            "SARIMA (d=1, D=1)", -->
-<!--            "log + SARIMA (d=0, D=1)", -->
-<!--            "log + SARIMA (d=1, D=1)", -->
-<!--            "BoxCox + SARIMA (d=0, D=1)", -->
-<!--            "Box-Cox + SARIMA (d=1, D=1)", -->
-<!--            "Holt-Winters", -->
-<!--            "testset") -->
-
-<!-- pred1 = forecast(model1, h=n) -->
-<!-- pred2 = forecast(model2, h=n) -->
-<!-- pred3 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
-<!-- pred4 = forecast(model4, h=n, biasadj=TRUE, lambda = 0) -->
-<!-- pred5 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
-<!-- pred6 = forecast(model6, h=n, biasadj=TRUE, lambda = -0.7) -->
-<!-- pred_hw = forecast(holt_winters, h=n) -->
-
-<!-- # plot(trainset, xlim=c(0,45)) -->
-<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 70)) -->
-<!-- lines(ts(pred0, frequency=7, start=c(41,1)), col="gray") -->
-<!-- lines(ts(pred1$mean, frequency=7, start=c(41,1)), col="blue") -->
-<!-- lines(ts(pred2$mean, frequency=7, start=c(41,1)), col="red") -->
-<!-- lines(ts(pred3$mean, frequency=7, start=c(41,1)), col="purple") -->
-<!-- lines(ts(pred4$mean, frequency=7, start=c(41,1)), col="orange") -->
-<!-- lines(ts(pred5$mean, frequency=7, start=c(41,1)), col="brown") -->
-<!-- lines(ts(pred6$mean, frequency=7, start=c(41,1)), col="green") -->
-<!-- legend("topleft", legend=models, col=c("gray", "blue", "red", "purple", "orange", "brown", "green", "black"), lw=1, box.lty=0, cex = 0.60) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- perf0 = cbind(type = models[1], getPerformance(as.vector(pred0), as.vector(testset))) -->
-<!-- perf1 = cbind(type = models[2], getPerformance(as.vector(pred1$mean), as.vector(testset))) -->
-<!-- perf2 = cbind(type = models[3], getPerformance(as.vector(pred2$mean), as.vector(testset))) -->
-<!-- perf3 = cbind(type = models[4], getPerformance(as.vector(pred3$mean), as.vector(testset))) -->
-<!-- perf4 = cbind(type = models[5], getPerformance(as.vector(pred4$mean), as.vector(testset))) -->
-<!-- perf5 = cbind(type = models[6], getPerformance(as.vector(pred5$mean), as.vector(testset))) -->
-<!-- perf6 = cbind(type = models[7], getPerformance(as.vector(pred6$mean), as.vector(testset))) -->
-<!-- perf_hw = cbind(type = models[8], getPerformance(as.vector(pred_hw$mean), as.vector(testset))) -->
-
-<!-- perf = rbind(perf0, perf1, perf2, perf3, perf4, perf5, perf6, perf_hw) -->
-
-<!-- list(perf[order(perf$RMSE), ], models[order(perf$RMSE)]) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- n = length(testset) -->
-
-<!-- pred0 = forecast(model0, h=n)$mean + pred_decomp(trainset, testset)$pred -->
-
-<!-- models = c("SARIMA (d=0, D=1)", -->
-<!--            "log + SARIMA (d=0, D=1)", -->
-<!--            "BoxCox + SARIMA (d=0, D=1)", -->
-<!--            "testset") -->
-
-<!-- top1 = forecast(model1, h=n) -->
-<!-- top2 = forecast(model3, h=n, biasadj=TRUE, lambda = 0) -->
-<!-- top3 = forecast(model5, h=n, biasadj=TRUE, lambda = -0.7) -->
-
-<!-- # plot(trainset, xlim=c(0,45)) -->
-<!-- plot(ts(testset, frequency=7, start=c(41,1)), ylim=c(18, 60)) -->
-<!-- lines(ts(top1$mean, frequency=7, start=c(41,1)), col="blue") -->
-<!-- lines(ts(top2$mean, frequency=7, start=c(41,1)), col="red") -->
-<!-- lines(ts(top3$mean, frequency=7, start=c(41,1)), col="gray") -->
-<!-- legend("topleft", legend=models, col=c("blue", "red", "gray", "black"), lw=1, box.lty=0, cex = .8) -->
-<!-- ``` -->
-
-<!-- ## Validation croisée -->
-
-<!-- Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien. -->
-
-<!-- Il est temps de comparer nous modèles sur des critères prédictifs. -->
-
-<!-- La procédure d'évaluation consiste en une validations croisées adaptées au série temporelle. L'image ci-dessus résume parfaitement l'idée. -->
-
-<!-- ![](https://miro.medium.com/max/1204/1*qvdnPF8ETV9mFdMT0Y_BBA.png) -->
-
-<!-- Le score utilisé pour comparer les modèles est la RMSE. -->
-
-
-<!-- ## Erreur de prédiction en fonction de l'horizon -->
-
-<!-- lien : https://otexts.com/fpp3/tscv.html -->
-
-<!-- ## Conclusion -->

@@ -25,14 +25,14 @@ decomp = function(trainset, testset){
   list("train"=train_trend+train_seasonal, "pred"=pred_trend+pred_seasonal)
 }
 
-plot_checkup_res = function(Res){
+plot_checkup_res = function(Res, title){
   # Partitionnement de la fenêtre graphique 
   layout(matrix(c(1,1,1,2:7), nrow=3, ncol=3, byrow=TRUE))
   par(mar = c(2.2, 2.8, 2.2, 2.2))
   # plot.window(xlim=c(0,length(Res)),ylim=c(min(Res),max(Res)))
   
   # Série des résidus
-  plot(Res,type='l', xlab='', ylab='', main="Analyse des incréments")
+  plot(Res,type='l', xlab='', ylab='', main=title)
   
   # ACF
   acf(Res, xlab="", ylab="", main="ACF")
@@ -56,7 +56,7 @@ plot_checkup_res = function(Res){
   qqline(Res)
   
   # Nuage de points standardisé
-  plot((Res-mean(Res))/sd(Res),col='blue', main="Résidus normalisés", ylab = '', xlab = '')
+  plot(Res, col='blue', main="Résidus normalisés", ylab = '', xlab = '')
   abline(a=1.96, b=0, col='red')
   abline(a=-1.96, b=0, col='red')
 }
@@ -68,9 +68,9 @@ test_res = function(res){
   print(shapiro.test(res))
 }
 
-check_res = function(res){
+check_res = function(res, title){
   res = res[which(!is.na(res))]
-  plot_checkup_res(res)
+  plot_checkup_res(res, title)
   test_res(res)
 }
 
