@@ -419,11 +419,9 @@ legend("topleft", legend=c("RMSE = 7.923", "MAPE = 0,179%"))
 
 # Annexe 3
 
-## Transformation Box-Cox et logarithmique
-
 Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour des transformations BoxCox et logarithmique des données.
 
-### Transformation logarithmique
+## Transformation logarithmique
 
 ```{r, echo=FALSE}
 log_trainset = ts(log(trainset), start=1, frequency = 7)
@@ -505,40 +503,45 @@ Tout les coefficients sont significatifs. On dispose donc d'un second modèle SA
 
 
 
-<!-- Effectuons la même procédure avec la transformation Box-Cox. -->
+Effectuons la même procédure avec la transformation Box-Cox.
 
-<!-- ```{r} -->
-<!-- bc_trainset = BoxCox(trainset, lambda=-0.7) -->
-<!-- plot(bc_trainset) -->
-<!-- ``` -->
+## Transformation BoxCox
 
-<!-- Puis appliquons un auto.arima. -->
-<!-- ```{r} -->
-<!-- model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE) -->
-<!-- model5 -->
-<!-- ``` -->
-<!-- Tous les coefficients sont significatifs. -->
+Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ. 
 
-<!-- ```{r} -->
-<!-- check_stat(model5$resid) -->
-<!-- ``` -->
+```{r}
+lamb = BoxCox.lambda(trainset, method = 'guerrero')
+bc_trainset = BoxCox(trainset, lambda=lamb)
+plot(bc_trainset)
+```
+
+Puis appliquons un auto.arima.
+```{r}
+model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE)
+model5
+```
+Tous les coefficients sont significatifs.
+
+```{r}
+check_stat(model5$resid)
+```
 
 
-<!-- ```{r} -->
-<!-- model6 = auto.arima(bc_trainset, d=1, D=1, allowdrift=TRUE, allowmean=TRUE) -->
-<!-- model6 -->
-<!-- ``` -->
-<!-- Tous les coefs sont significatifs. -->
+```{r}
+model6 = auto.arima(bc_trainset, d=1, D=1, allowdrift=TRUE, allowmean=TRUE)
+model6
+```
+Tous les coefs sont significatifs.
 
-<!-- ```{r} -->
-<!-- check_stat(model6$residuals) -->
-<!-- ``` -->
-<!-- ## Holt-Winters -->
+```{r}
+check_stat(model6$residuals)
+```
+## Holt-Winters
 
-<!-- ```{r} -->
-<!-- holt_winters = HoltWinters(trainset, seasonal="additive") -->
-<!-- plot(holt_winters) -->
-<!-- ``` -->
-<!-- ```{r} -->
-<!-- check_stat(trainset - holt_winters$fitted[,1]) -->
-<!-- ``` -->
+```{r}
+holt_winters = HoltWinters(trainset, seasonal="additive")
+plot(holt_winters)
+```
+```{r}
+check_stat(trainset - holt_winters$fitted[,1])
+```
