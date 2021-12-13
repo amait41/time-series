@@ -34,7 +34,7 @@ Cette série présente plusieurs caractéristiques remarquables.
 
 Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre de commandes croit du dimanche au vendredi puis décroît le samedi en moyenne.
 
-La série semble composée de deux voir trois régime. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis, vient 16 semaines de tendance baissière, avec une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semble reprendre quelque peu le schéma de premières semaine avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
+La série semble composée de deux voir trois régimes. Un premier lors des 18 premières semaines avant une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis vient une période de 16 semaines avec tendance baissière, une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semblent reprendre le schéma des premières semaines avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
 
 ```{r,  echo=FALSE, fig.width=15, fig.height=4}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
@@ -60,11 +60,11 @@ help(seasonplot)
 seasonplot(trainset, type="l", main="Graphique saisonnier", xlab="Jour", ylab="# commandes", season.labels=c("Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"))
 ```
 
-Les modèles $ARMA$ font l'hypothèse que la série temporelle est stationnaire (du second ordre), c'est à dire que sa moyenne et sa covariance sont invariantes par translation dans le temps. Pour rendre cette série stationnaire, nous allons utiliser plusieurs approches telles que la décomposition (partie 2) et la différentiation (partie 3). Puis nous établirons des modèles de la famille $ARIMA$ à l'aide de la fonction `auto.arima` et `checkup_res` (partie 3) avant d'évaluer nos modèles sur le jeu de donnée test avec des critères prédictifs (partie 4).
+Les modèles $ARMA$ font l'hypothèse que la série temporelle est stationnaire (du second ordre), c'est à dire que sa moyenne et sa covariance sont invariantes par translation dans le temps. Pour rendre cette série stationnaire, nous allons utiliser plusieurs approches telles que la décomposition (partie 2) et la différenciation (partie 3). Puis nous établirons des modèles de la famille $ARIMA$ à l'aide des fonctions `auto.arima` et `checkup_res` (partie 3) avant d'évaluer nos modèles sur le jeu de donnée test avec des critères prédictifs (partie 4).
 
 # Décomposition
 
-Afin de valider cette hypothèse, il est possible d'appliquer la procédure suivante. Dans un premier temps, on applique sur la série un opérateur moyenne mobile $M_m(B) = \frac{1}{2m+1} \sum\limits_{n=1}^{m} B^{-k}$  qui élimine  les tendances $\tau$-périodiques avec $B$ l'opérateur de retard tel que $B^kX_t=X_{t-k}$. Puis, on estime par régression la tendance sur la série filtrée. Enfin, on estime la composante saisonnière en effectuant la moyenne des périodes et en dupliquant ce résultat autant de fois que nécéssaire. On obtient la décomposition ci-dessous.
+Afin de valider cette hypothèse, il est possible d'appliquer la procédure suivante. Dans un premier temps, on applique sur la série un opérateur moyenne mobile $M_m(B) = \frac{1}{2m+1} \sum\limits_{n=1}^{m} B^{-k}$ qui élimine les tendances $\tau$-périodiques avec $B$ l'opérateur de retard tel que $B^kX_t=X_{t-k}$. Puis, on estime par régression la tendance sur la série filtrée. Enfin, on estime la composante saisonnière en effectuant la moyenne des périodes et en dupliquant ce résultat autant de fois que nécéssaire. On obtient la décomposition ci-dessous.
 
 ```{r, fig.width=7, fig.height=5, echo=FALSE}
 decomposition = decompose(trainset)
@@ -83,7 +83,7 @@ decomp.plot2(decomposition, main="Décomposition additive de la série")
 # decomposition_stl = stl(trainset, s.window=7)
 # plot(decomposition_stl)
 ```
-Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une regression linéaire sur la tendance puis y ajouter la composante saisonnière.
+Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une régression linéaire sur la tendance puis y ajouter la composante saisonnière.
 
 ```{r, fig.width = 12, fig.height=4, echo=FALSE, warning=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
@@ -106,12 +106,12 @@ legend("topright", legend=c("ordre 1", "ordre 2", "ordre 3", "ordre 4"), col=c("
 decomp_ = decomp(trainset, testset)
 plot(decomp_$train, main="Régression + composante saisonière", xlab="Périodes", ylab="decomp$trend + decomp$seasonal")
 ```
-Visuellement, les regression d'ordre 3 et 4 donnent de très bon résultat avec un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garder la régression linéaire d'ordre 3. Analysons à présent les résidus de la décomposition.
+Visuellement, les régressions d'ordre 3 et 4 donnent de très bons résultats avec un R² ajusté de 0.88. Le principe de parcimonie nous pousse à garder la régression linéaire d'ordre 3. Analysons à présent les résidus de la décomposition.
 
 ```{r, fig.width=8, fig.height=4, echo=FALSE, warning=FALSE}
 plot(decomposition$random, ylab="", xlab="Période", main="Résidus de la décomposition")
 ```
-Il semble y avoir une légère sésonalité dans les résidus.
+Il semble y avoir une légère saisonnalité dans les résidus.
 
 En plus de l'aspect visuel, les tests suivants permettent d'évaluer l'hypothèse de stationarité :<br>
 - ADF avec $\mathcal{H}_0$ : "la trajectoire est issue d'un processus non stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.<br>
@@ -129,8 +129,8 @@ kpss.test(res_decomp)
 
 Les tests s'accordent. Le test ADF rejette l'hypothèse de non stationarité (p-value<<0.05) alors que le test KPSS ne rejette pas l'hypothèse de stationarité (p-value>>0.05). Nous avons donc obtenu des résidus stionnaires d'après ces tests.
 
-Présentons maintenant deux outils indispensable à l'étude des processus ARMA: l'ACF et la PAFC:<br>
-- L'AFC représente les autocorrélation entre deux valeurs distantes de $h$ dans le temps. Une autocorrélation nulle à partir d'un rang $q+1$ est caractéristique d'un processus $MA(q)$.<br>
+Présentons maintenant deux outils indispensables à l'étude des processus ARMA: l'ACF et la PACF:<br>
+- L'ACF représente les autocorrélations entre deux valeurs distantes de $h$ dans le temps. Une autocorrélation nulle à partir d'un rang $q+1$ est caractéristique d'un processus $MA(q)$.<br>
 - L'autocorrélogramme PAFC représente quand à lui les corrélation "pur" entre deux valeurs distantes de $h$ dans le temps, c'est à dire entre lesquelles on a supprimé l'influence linéaire des valeurs intermédiaires. Une PACF avec des pics dans le couloir de non-significativité à partir du rang $p+1$ est caractéristique d'un processus $AR(p)$.
 
 De plus, on justifie une tentative de modélisation par un processus $ARMA$ lorsque la série est considérée comme stationnaire et que ses ACF et PACF empiriques montrent une décroissance rapide.
@@ -146,13 +146,13 @@ En conclusion, les résidus du modèle de decomposition ne sont pas stationnaire
 
 # Différenciation
 
-## Différentiation simple
+## Différenciation simple
 
 Afin de rendre une série stationnaire, il est possible d'intégrer cette dernière en lui appliquant un filtre de la forme $(I-B)$.  On regarde alors si $\Delta X_t = (I-B)X_t$ est stationnaire.
 
-Cette méthodes ne donne pas de résultats satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
+Cette méthode ne donne pas de résultats satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
 
-Les tests de stationarité nous incitent à penser que la série différanciée $(\Delta X_t)$ est pas stationnaire.
+Les tests de stationnarité nous incitent à penser que la série différenciée $(\Delta X_t)$ n'est pas stationnaire.
 
 ```{r, echo=FALSE, results='hide', warning=FALSE}
 diff1 = diff(trainset, lag=1)
@@ -164,18 +164,18 @@ kpss.test(diff1)
 | ADF       | -11.875     | <0.01     |
 | KPSS      | 0.06673     | >0.1      |
 
-Néanmoins, l'ACF et la PACF présentent repectivement des autocorrélationS très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
+Néanmoins, l'ACF et la PACF présentent repectivement des autocorrélations très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
 
 ```{r, fig.width=12, fig.height=4, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(diff1, main="")
 pacf(diff1, main="")
 ```
-Nous devons conclure que les incréments ne sont pas stationnaires car ils contients encore une composante saisonnière.
+Nous en concluons que les incréments ne sont pas stationnaires car ils contiennent encore une composante saisonnière.
 
 ## Différentiation saisonnière
 
-La différentiation saisonnière consiste à appliquer un filtre de la forme $(I-B^s)$ à notre série. On obtient alors les incréments saisonniers $(\Delta_s X_t = (I-B^s)X_t)$. L'application de ce filtre sur la série semble tout indiqué car il élimine les tendances s-périodique. Les tests ADF et KPPSS s'accordent sur l'hypothèse de stationarité. 
+La différenciation saisonnière consiste à appliquer un filtre de la forme $(I-B^s)$ à notre série. On obtient alors les incréments saisonniers $(\Delta_s X_t = (I-B^s)X_t)$. L'application de ce filtre à la série semble tout indiquée car ce dernier élimine les tendances périodiques. Les tests ADF et KPPSS s'accordent sur l'hypothèse de stationnarité. 
 
 | Test      | Statistique | p-value   |
 |-----------|-------------|-----------|
@@ -194,7 +194,7 @@ layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(diff7, lag=40, main="")
 pacf(diff7, lag=40, main="")
 ```
-Essayons de différencier à nouveau la série, c'est à dire d'appliquer le filtre $(I-B)(I-B^7)$ sur la série.
+Essayons de différencier à nouveau la série, c'est à dire d'appliquer le filtre $(I-B)(I-B^7)$ sur la série de départ.
 
 Les tests vont encore dans le sens de la stationnarité.
 
@@ -208,32 +208,32 @@ ddiff7 = diff(diff(trainset, lag=7))
 adf.test(ddiff7)
 kpss.test(ddiff7)
 ```
-L'ACF et la PACF donnent de moins bon résultat dans le sens où l'ACF donne des résultats similaires mais la PACF décroit beaucoup moins vite et possède d'avantage de pics significatifs.
+L'ACF et la PACF donnent de moins bons résultats dans le sens où l'ACF donne des résultats similaires mais la PACF décroit beaucoup moins vite et présente d'avantage de pics significatifs.
 
 ```{r, fig.width=12, fig.height=4, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(ddiff7, lag=40, main="")
 pacf(ddiff7, lag=40, main="")
 ```
-Conclusion, la série différenciée avec le filtre $(I-B^7)$ remplie le critère de stationarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)(P,D,Q)_7$ avec $(d,D)=(0,1)$.
+Conclusion, la série différenciée avec le filtre $(I-B^7)$ remplit le critère de stationnarité. Il est donc possible d'appliquer un modèle de type $SARIMA(p,d,q)(P,D,Q)_7$ avec $(d,D)=(0,1)$.
 
 # Modélisation
 
-Nous avons vu dans la partie précédante qu'une différanciation d'ordre 1 avec le filtre $(I-B^7)$ donne une série stationnaire. Cela motive l'idée d'appliquer un modèle $SARIMA(p,0,q)(Q,1,P)_7$. Nous déterminons les coefficients p, q, Q et P avec la méthode `auto.arima`. Il est important d'effectuer la recherche du meilleur modèle avec les paramètres `allowdrift=TRUE` et `include.mean=TRUE` car la différanciation effectuée élimine totalement les tendance d'ordre 1. Le résultat de la recherche est présenté ci-dessous:
+Nous avons vu dans la partie précédente qu'une différenciation d'ordre 1 avec le filtre $(I-B^7)$ donne une série stationnaire. Cela motive l'idée d'appliquer un modèle $SARIMA(p,0,q)(Q,1,P)_7$. Nous déterminons les coefficients p, q, Q et P avec la méthode `auto.arima`. Il est important d'éffectuer la recherche du meilleur modèle avec les paramètres `allowdrift=TRUE` et `include.mean=TRUE` car la différenciation effectuée élimine totalement les tendances d'ordre 1. Le résultat de la recherche est présenté ci-dessous:
 
 ```{r, echo=FALSE}
 model1 = auto.arima(trainset, d=0, D=1, allowdrift=TRUE, include.mean=TRUE)
 model1
 ```
-Pour estimer la pertinance du modèle et en particulier la significativité d'un coefficient, on divise la valeurs de ce derniers par son écart type. Le quotient doit se trouver hors de l'intervalle $[-1.96, 196]$ afin que le paramètre soit considéré comme significatif. Les coefficients ma4, sar1 et drift non sont pas significatifs. Testons alors le modèle $SARIMA(3,0,3)(0,1,1)_7$ sans tendance linéaire.
+Pour estimer la pertinence du modèle et en particulier la significativité d'un coefficient, on divise la valeur de ce derniers par son écart type. Le quotient doit se trouver hors de l'intervalle $[-1.96, 1,96]$ pour que le paramètre soit considéré comme significatif. Les coefficients ma4, sar1 et drift ne sont pas significatifs. Testons donc le modèle $SARIMA(3,0,3)(0,1,1)_7$ sans tendance linéaire.
 
 ```{r, echo=FALSE}
 model1 = auto.arima(trainset, d=0, D=1, max.P=0, include.mean=TRUE)
 model1
 ```
-Les coefficients sont tous significatifs sauf le drift. Le score BIC obtenu pour ce modèle est meilleur que pour le modèle précédant avec 1708 contre 1717,88.
+Les coefficients sont tous significatifs sauf le drift. Le score BIC obtenu pour ce modèle est meilleur que pour le modèle précédent avec 1708 contre 1717,88.
 
-Pour considérer que le modèle est bon, les résidus doivent former si possible un bruit blanc. Autrement dit, les résidus réduits doivent être stationnaires, centrés, indépendants et suivre une loi normale. Pour ce faire nous utilisons différants outils statistiques tels que les tests ADF et KPSS présentés précédamment ainsi que les tests de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "La série temporelle ne possède pas d'autocorrélation." et de Shapiro d'hypothèse nulle $\mathcal{H_0}$ : "L'échantillon suit une loi normale."
+Pour considérer le modèle comme satifaisant, les résidus doivent former si possible un bruit blanc. Autrement dit, les résidus réduits doivent être stationnaires, centrés, indépendants et suivre une loi normale. Pour ce faire nous utilisons différents outils statistiques tels que les tests ADF et KPSS présentés précédemment ainsi que les tests de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "La série temporelle ne possède pas d'autocorrélation." ou de Shapiro d'hypothèse nulle $\mathcal{H_0}$ : "L'échantillon suit une loi normale."
 
 | Test          | Statistique | p-value   |
 |---------------|-------------|-----------|
@@ -246,9 +246,9 @@ Pour considérer que le modèle est bon, les résidus doivent former si possible
 res_model1 = model1$residuals / sd(model1$residuals)
 check_res(res_model1, "Analyse de résidus : SARIMA(3,0,3)(0,1,1)[7]")
 ```
-Les résidus de ce modèle 1 semblent tout à fait correspondre à un bruit blanc. En effet, l'ACF et la PACF n'ont aucun pics hors du couloir de non-significativité, les tests ADF et KPSS estiment les résidus stationnaires et le test de Ljung-Box avec une p-value relativement élevée de 0.9628 ne rejette pas l'hypothèse d'indépendance. Néanmoins, leur distribution est légèrement trop concentrée pour coller parfaitement à une distribustion normal. La p-value du test de Shapiro en témoigne.
+Les résidus de ce modèle 1 semblent tout à fait correspondre à un bruit blanc. En effet, l'ACF et la PACF n'ont aucun pic hors du couloir de non-significativité, les tests ADF et KPSS estiment les résidus stationnaires et le test de Ljung-Box avec une p-value relativement élevée de 0.9628 ne rejette pas l'hypothèse d'indépendance. Néanmoins, leur distribution est légèrement trop concentrée pour coller parfaitement à une distribution normale, comme peut en témoigner la p-value du test de Shapiro.
 
-Ce modèle est relativement satisfaisant. D'autres modèles ont été évalués en Annexe 3, notamment en appliquant des transformations de Box-Cox et logarithmique. L'annexe 4 contient les résultats (non probants) des modélisations explotant le paramètre `xreg` de la fonction `auto.arima`. Les modèles retenus sont les suivants :
+Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Annexe 3, notamment en appliquant des transformations de Box-Cox et logarithmique. L'annexe 4 contient les résultats (non probants) des modélisations exploitant le paramètre `xreg` de la fonction `auto.arima`. Les modèles retenus sont les suivants :
 
 | Modèle                  | Transformation | BIC       |
 |-------------------------|----------------|-----------|
@@ -260,9 +260,9 @@ Ce modèle est relativement satisfaisant. D'autres modèles ont été évalués 
 
 # Prédiction
 
-Précédement, la comparaison des modèles était basées sur des critères intégrant la notion de parciemonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle soit un bruit blanc gaussien.
+Précédemment, la comparaison des modèles était basée sur des critères intégrant la notion de parcimonie avec le score BIC et l'étude des coefficients significatif. Nous portions aussi une grande importance à ce que les résidus du modèle forment un bruit blanc gaussien.
 
-Il est temps de comparer nous modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validations simple. Les scores utilisés pour comparer les modèles sont la RMSE et la métrique MAPE pour Mean Absolute Percentage Error.
+Il est temps de comparer nos modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validation simple. Les scores utilisés pour comparer les modèles sont les métriques RMSE et MAPE (Mean Absolute Percentage Error).
 
 ```{r, echo=FALSE, results='markup'}
 sarima = Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE)
@@ -416,97 +416,94 @@ legend("topleft", legend=c("RMSE = 7.923", "MAPE = 0,179%"))
 
 <!-- On constate globalement que qu'il est possible d'obtenir des résidus bruit blanc. Cependant, ils ne semblent pas suivre une loi gaussienne. De plus, il possible que notre série soit légèrement hétéroscédastique. Des transformations telles que Box-Cox ou le passage au logarithme peuvent potentiellment atténuer voir corriger ce cela. -->
 
-<!-- ### Transformation de Box-Cox et logarithmique -->
 
-<!-- ```{r} -->
-<!-- log_trainset = ts(log(trainset), start=1, frequency = 7) -->
-<!-- autoplot(log_trainset) -->
-<!-- ``` -->
-<!-- On a réussi à bien réduire la variance. Voyons ce que disent les tests ADF et KPSS. -->
+# Annexe 3
 
-<!-- ```{r} -->
-<!-- LogTS = log_trainset -->
-<!-- DLogTS1 = diff(LogTS) -->
-<!-- autoplot(DLogTS1) -->
-<!-- ``` -->
-<!-- ```{r} -->
-<!-- kpss.test(DLogTS1) -->
-<!-- adf.test(DLogTS1) -->
-<!-- ``` -->
-<!-- Les tests vont dans le sens de la stationnarité -->
+## Transformation Box-Cox et logarithmique
 
-<!-- ```{r} -->
-<!-- acf(as.numeric(DLogTS1), lag.max=40) -->
-<!-- pacf(as.numeric(DLogTS1), lag.max=40) -->
-<!-- ``` -->
-<!-- Mais pas l'ACF où un motif périodique se dessine clairement. -->
-<!-- On voit néanmois qu'on a réussi à éliminer la tendance. -->
-<!-- Pour éliminer le motif périodique, essayons une différenciation d'ordre 7 -->
+Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour des transformations BoxCox et logarithmique des données.
 
+### Transformation logarithmique
 
-<!-- Differenciation I-B⁷ -->
-<!-- ```{r} -->
-<!-- DLogTS2 = diff(LogTS,7) -->
-<!-- plot(DLogTS2) -->
-<!-- ``` -->
+```{r, echo=FALSE}
+log_trainset = ts(log(trainset), start=1, frequency = 7)
+autoplot(log_trainset)
+```
+Une telle transformation n'est pas satisfaisante, on va tenter plusieurs différenciations jusqu'à ce que la série soit stationnaire.
 
-<!-- ```{r} -->
-<!-- kpss.test(DLogTS2) -->
-<!-- adf.test(DLogTS2) -->
-<!-- ``` -->
-<!-- Les tests vont dans le sens de la stationnarité -->
+### Différenciation $I-B$
 
-<!-- ```{r} -->
-<!-- acf(as.numeric(DLogTS2), lag.max=40) -->
-<!-- pacf(as.numeric(DLogTS2), lag.max=40) -->
-<!-- ``` -->
-<!-- ACF : décroissance rapide avec un pic à 7 -->
-<!-- PACF : -->
+```{r, echo=FALSE}
+LogTS = log_trainset
+DLogTS1 = diff(LogTS)
+autoplot(DLogTS1)
+```
+Sur cette série, les tests KPSS et ADF donnent :
+```{r, echo=FALSE}
+kpss.test(DLogTS1)
+adf.test(DLogTS1)
+```
+Ces tests vont donc dans le sens de la stationnarité. Mais si on regarde l'ACF et la PACF, cela ne conforte pas cette hypothèse :
+
+```{r, echo=FALSE}
+acf(as.numeric(DLogTS1), lag.max=40)
+pacf(as.numeric(DLogTS1), lag.max=40)
+```
+En effet, un motif périodique se dessine clairement. On voit néanmoins qu'on a réussi à réduire la tendance, pour éliminer le motif périodique, essayons une différenciation d'ordre 7
 
 
-<!-- Differenciation (I-B)(I-B⁷) -->
-<!-- ```{r} -->
-<!-- DLogTS3 = diff(diff(LogTS,7)) -->
-<!-- plot(DLogTS3) -->
-<!-- ``` -->
+### Différenciation $(I-B^7)$
 
-<!-- ```{r} -->
-<!-- kpss.test(DLogTS3) -->
-<!-- adf.test(DLogTS3) -->
-<!-- ``` -->
-<!-- Les tests vont dans le sens de la stationnarité -->
+```{r, echo=FALSE}
+DLogTS2 = diff(LogTS,7)
+plot(DLogTS2)
+```
 
-<!-- ```{r} -->
-<!-- acf(as.numeric(DLogTS3), lag.max=40) -->
-<!-- pacf(as.numeric(DLogTS3), lag.max=40) -->
-<!-- ``` -->
+Les tests KPSS et ADF ainsi que l'analyse visuelle vont dans le sens de la stationnarité.
+```{r, echo=FALSE}
+kpss.test(DLogTS2)
+adf.test(DLogTS2)
+```
+
+Tentons pour finir une différenciation $(I-B)(I-B^7)$
 
 
-<!-- Conclusion : Il est judicieux de considérer les séries DLogTS2 et DLogTS dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries. -->
+### Differenciation (I-B)(I-B⁷)
+
+```{r, echo=FALSE}
+DLogTS3 = diff(diff(LogTS,7))
+plot(DLogTS3)
+```
+
+Les tests KPSS et ADF ainsi que l'analyse visuelle vont dans le sens de la stationnarité.
+
+```{r, echo=FALSE}
+kpss.test(DLogTS3)
+adf.test(DLogTS3)
+```
+En conclusion, il est judicieux de considérer les séries DLogTS2 et DLogTS correspondant aux différenciations $I-B^7$ et $(I-B)(I-B^7)$ dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries.
 
 
-<!-- ```{r} -->
-<!-- model3 = auto.arima(log_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE) -->
-<!-- model3 -->
-<!-- ``` -->
-<!-- Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle -->
+### Détermination des modèles
 
-<!-- ```{r} -->
-<!-- plot(log_trainset) -->
-<!-- lines(model3$fitted,col='red') -->
-<!-- ``` -->
-<!-- Analyse des résidus du modèle. -->
+On utilise la fonction `auto.arima` pour déterminer les modèles SARIMA expliquant le mieux nos données
+Un premier modèle avec $d=0$ et $D=1$ ressort :
+```{r, echo=FALSE}
+model3 = auto.arima(log_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE)
+model3
+```
+Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle. On dispose donc d'un premier modèle SARIMA$(2,0,3)(0,1,1)_7$.
 
-<!-- ```{r} -->
-<!-- check_stat(model3$residuals) -->
-<!-- ``` -->
 
-<!-- Deuxième modèle -->
-<!-- ```{r} -->
-<!-- model4 = auto.arima(log_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE) -->
-<!-- model4 -->
-<!-- ``` -->
-<!-- Tout les termes sont significatifs. -->
+On peut ensuite déterminer un scond modèle avec $d=1$ et $D=1$ :
+```{r, echo=FALSE}
+model4 = auto.arima(log_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
+model4
+```
+Tout les coefficients sont significatifs. On dispose donc d'un second modèle SARIMA$(1,1,1)(1,1,1)_7$.
+
+
+
 
 <!-- Effectuons la même procédure avec la transformation Box-Cox. -->
 
