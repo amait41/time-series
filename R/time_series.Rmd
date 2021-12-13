@@ -419,129 +419,85 @@ legend("topleft", legend=c("RMSE = 7.923", "MAPE = 0,179%"))
 
 # Annexe 3
 
-Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour des transformations BoxCox et logarithmique des données.
-
-## Transformation logarithmique
+Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ. 
 
 ```{r, echo=FALSE}
-log_trainset = ts(log(trainset), start=1, frequency = 7)
-autoplot(log_trainset)
+lamb = BoxCox.lambda(trainset, method = 'guerrero')
+bc_trainset = BoxCox(trainset, lambda=lamb)
+plot(bc_trainset)
 ```
 Une telle transformation n'est pas satisfaisante, on va tenter plusieurs différenciations jusqu'à ce que la série soit stationnaire.
 
-### Différenciation $I-B$
+## Différenciation I-B
 
 ```{r, echo=FALSE}
-LogTS = log_trainset
-DLogTS1 = diff(LogTS)
-autoplot(DLogTS1)
+BCTS1 = diff(bc_trainset)
+autoplot(BCTS1)
 ```
 Sur cette série, les tests KPSS et ADF donnent :
 ```{r, echo=FALSE}
-kpss.test(DLogTS1)
-adf.test(DLogTS1)
+kpss.test(BCTS1)
+adf.test(BCTS1)
 ```
 Ces tests vont donc dans le sens de la stationnarité. Mais si on regarde l'ACF et la PACF, cela ne conforte pas cette hypothèse :
 
 ```{r, echo=FALSE}
-acf(as.numeric(DLogTS1), lag.max=40)
-pacf(as.numeric(DLogTS1), lag.max=40)
+acf(as.numeric(BCTS1), lag.max=40)
+pacf(as.numeric(BCTS1), lag.max=40)
 ```
-En effet, un motif périodique se dessine clairement. On voit néanmoins qu'on a réussi à réduire la tendance, pour éliminer le motif périodique, essayons une différenciation d'ordre 7
+En effet, un motif périodique se dessine clairement. On voit néanmoins sur le graphe qu'on a réussi à réduire la tendance. Pour éliminer le motif périodique, essayons une différenciation d'ordre 7
 
 
-### Différenciation $(I-B^7)$
+## Différenciation I-B⁷
 
 ```{r, echo=FALSE}
-DLogTS2 = diff(LogTS,7)
-plot(DLogTS2)
+BCTS2 = diff(bc_trainset,7)
+plot(BCTS2)
 ```
 
 Les tests KPSS et ADF ainsi que l'analyse visuelle vont dans le sens de la stationnarité.
 ```{r, echo=FALSE}
-kpss.test(DLogTS2)
-adf.test(DLogTS2)
+kpss.test(BCTS2)
+adf.test(BCTS2)
 ```
 
 Tentons pour finir une différenciation $(I-B)(I-B^7)$
 
-
 ### Differenciation (I-B)(I-B⁷)
 
 ```{r, echo=FALSE}
-DLogTS3 = diff(diff(LogTS,7))
-plot(DLogTS3)
+BCTS3 = diff(diff(bc_trainset,7))
+plot(BCTS3)
 ```
 
 Les tests KPSS et ADF ainsi que l'analyse visuelle vont dans le sens de la stationnarité.
 
 ```{r, echo=FALSE}
-kpss.test(DLogTS3)
-adf.test(DLogTS3)
+kpss.test(BCTS3)
+adf.test(BCTS3)
 ```
 En conclusion, il est judicieux de considérer les séries DLogTS2 et DLogTS correspondant aux différenciations $I-B^7$ et $(I-B)(I-B^7)$ dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries.
-
 
 ### Détermination des modèles
 
 On utilise la fonction `auto.arima` pour déterminer les modèles SARIMA expliquant le mieux nos données
 Un premier modèle avec $d=0$ et $D=1$ ressort :
 ```{r, echo=FALSE}
-model3 = auto.arima(log_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE)
+model3 = auto.arima(bc_trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE)
 model3
 ```
-Le terme ar1 n'est pas significatif, mais le terme ar2 l'étant, on ne va pas modifier notre modèle. On dispose donc d'un premier modèle SARIMA$(2,0,3)(0,1,1)_7$.
+Les termes ar2, ar3 et ar4 ne sont pas significatifs, on va donc modifier un peu notre modèle.
 
-
-On peut ensuite déterminer un scond modèle avec $d=1$ et $D=1$ :
 ```{r, echo=FALSE}
-model4 = auto.arima(log_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
+model3 = auto.arima(bc_trainset, allowmean=TRUE, max.p = 1, max.q = 1, D=1, d=0, allowdrift=TRUE)
+model3
+```
+Le coefficient sma1 n'est pas significatif, mais sma2 l'est, donc on garde ce modèle qui est meilleur que le précédent au sens du critère BIC. On dispose donc d'un premier modèle SARIMA$(1,0,1)(1,1,2)_7$.
+
+
+On peut ensuite déterminer un second modèle avec $d=1$ et $D=1$ :
+```{r, echo=FALSE}
+model4 = auto.arima(bc_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
 model4
 ```
-Tout les coefficients sont significatifs. On dispose donc d'un second modèle SARIMA$(1,1,1)(1,1,1)_7$.
-
-
-
-
-Effectuons la même procédure avec la transformation Box-Cox.
-
-## Transformation BoxCox
-
-Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ. 
-
-```{r}
-lamb = BoxCox.lambda(trainset, method = 'guerrero')
-bc_trainset = BoxCox(trainset, lambda=lamb)
-plot(bc_trainset)
-```
-
-Puis appliquons un auto.arima.
-```{r}
-model5 = auto.arima(bc_trainset, d=0, D=1, allowdrift=TRUE, allowmean=TRUE)
-model5
-```
-Tous les coefficients sont significatifs.
-
-```{r}
-check_stat(model5$resid)
-```
-
-
-```{r}
-model6 = auto.arima(bc_trainset, d=1, D=1, allowdrift=TRUE, allowmean=TRUE)
-model6
-```
-Tous les coefs sont significatifs.
-
-```{r}
-check_stat(model6$residuals)
-```
-## Holt-Winters
-
-```{r}
-holt_winters = HoltWinters(trainset, seasonal="additive")
-plot(holt_winters)
-```
-```{r}
-check_stat(trainset - holt_winters$fitted[,1])
-```
+Les coefficients ma2 et sma1 ne sont pas significatifs, mais ne nous ammènent pas à rétrograder notre modèle. On dispose donc d'un second modèle SARIMA$(0,1,3)(1,1,2)_7$.
