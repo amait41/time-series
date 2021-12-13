@@ -3,6 +3,7 @@ help(MLmetrics)
 decomp = function(trainset, testset){
   n1 = length(trainset)
   n2 = length(testset)
+
   # Fit decompose and apply reg lin on trend
   decomp = decompose(trainset)
   t = 1:n1
@@ -11,6 +12,7 @@ decomp = function(trainset, testset){
   reg_lin = lm(decomp$trend ~ t + t2 + t3)
   train_trend = reg_lin$coefficients[1] + t * reg_lin$coefficients[2] + t2 * reg_lin$coefficients[3] + t3 * reg_lin$coefficients[4]
   train_seasonal = decomp$seasonal
+  
   # Predict with h = length(testset)
   x = (n1 + 1) : (n1 + n2)
   x2 = x**2
@@ -21,6 +23,7 @@ decomp = function(trainset, testset){
   }else{
     pred_seasonal = c(rep(decomp$figure, n2%/%7), decomp$figure[1:n2%%7])
   }
+  
   # pred_trend+pred_seasonal
   list("train"=train_trend+train_seasonal, "pred"=pred_trend+pred_seasonal)
 }
