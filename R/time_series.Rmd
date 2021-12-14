@@ -1,16 +1,18 @@
 ---
-title: "Série Chronologique - Projet"
+title: \vspace{3.5in}"Série Chronologique - Projet"
+author: "M. Le Paumier, A. Maïtammar"
+date: "`r Sys.Date()`"
 output:
-  pdf_document: 
-    toc: yes
-    fig_width: 7
-    fig_height: 4
-    fig_caption: yes
-    number_sections: yes
-    keep_tex: yes
+   pdf_document:
+      fig_caption: true
+      number_sections: true
 ---
 
-```{r warning=FALSE, echo=FALSE, results='hide'}
+\newpage
+\tableofcontents
+\newpage
+
+```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
 library(tseries)
 library(forecast)
 source(file = "functions.R")
@@ -240,6 +242,7 @@ Pour considérer le modèle comme satifaisant, les résidus doivent former si po
 res_model1 = model1$residuals / sd(model1$residuals)
 check_res(res_model1, "Analyse de résidus : SARIMA(3,0,3)(0,1,1)[7]")
 ```
+
 Les résidus de ce modèle 1 semblent tout à fait correspondre à un bruit blanc. En effet, l'ACF et la PACF n'ont aucun pic hors du couloir de non-significativité, les tests ADF et KPSS estiment les résidus stationnaires et le test de Ljung-Box avec une p-value relativement élevée de 0.9628 ne rejette pas l'hypothèse d'indépendance. Néanmoins, leur distribution est légèrement trop concentrée pour coller parfaitement à une distribution normale, comme peut en témoigner la p-value du test de Shapiro.
 
 Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Annexe 2 et 3, notamment en appliquant des transformations de Box-Cox et logarithmique. L'annexe 4 contient les résultats (non probants) des modélisations exploitant le paramètre `xreg` de la fonction `auto.arima`. Les modèles retenus sont les suivants :
@@ -252,6 +255,8 @@ Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Anne
 | SARIMA(2,0,3)(0,1,1)[7] | Box-Cox        | -1185.07  |
 | Holt-Winters            | Aucune         | -1185.07  |
 | ETS                     | STL            |           |
+
+\newpage
 
 # Prédiction
 
@@ -308,22 +313,24 @@ legend("topleft", legend=c("RMSE = 7.923", "MAPE = 0,179%"))
 
 # Conclusion
 
-Grâce aux conclusions des études de la série des parties 1 et 2 nous avons pu construire un modèle $ SARIMA(2,0,3)(0,1,1)_7$ ayant obtenu un score RMSE de 7,923 sur le jeu de données test. Soit une série temporelle $(X_t)$, l'écriture explicite de ce modèle est $(I-\phi_1B - \phi_2B^2)Y_t =(I+\theta_1B+\theta_2B^2+\theta_3B^3)(I+\beta_1B^7)\epsilon_t$ avec $Y_t = (I-B^7)X_t$. On réécrit cela sous la forme $Y_t = \phi_1Y_{t-1} + \phi_2Y_{t-2} + \epsilon_t + \theta_1\epsilon_{t-1} + \theta_2\epsilon_{t-2} + \theta_3\epsilon_{t-3} + \beta_1(\epsilon_{t-7} + \theta_1\epsilon_{t-8} + \theta_2\epsilon_{t-9} + \theta_3\epsilon_{t-10})$ avec 
-$$
-\begin{equation}
-    \begin{cases}
-      \phi_1 = \\
-        \theta_1 = \\
-        \theta_2 = \\
-        \theta_3 = \\
-        \beta_1 = \\
-    \end{cases}       
-\end{equation}
-$$
+Grâce aux conclusions des études de la série des parties 1 et 2 nous avons pu construire un modèle $SARIMA(2,0,3)(0,1,1)_7$ ayant obtenu un score RMSE de 7,923 sur le jeu de données test. Soit une série temporelle $(X_t)$, l'écriture explicite de ce modèle est $(I-\phi_1B - \phi_2B^2)Y_t =(I+\theta_1B+\theta_2B^2+\theta_3B^3)(I+\beta_1B^7)\epsilon_t$ avec $Y_t = (I-B^7)X_t$. On réécrit cela sous la forme $Y_t = \phi_1Y_{t-1} + \phi_2Y_{t-2} + \epsilon_t + \theta_1\epsilon_{t-1} + \theta_2\epsilon_{t-2} + \theta_3\epsilon_{t-3} + \beta_1(\epsilon_{t-7} + \theta_1\epsilon_{t-8} + \theta_2\epsilon_{t-9} + \theta_3\epsilon_{t-10})$.
+<!-- $$ -->
+<!-- \begin{equation} -->
+<!--     \begin{cases} -->
+<!--       \phi_1 = \\ -->
+<!--         \theta_1 = \\ -->
+<!--         \theta_2 = \\ -->
+<!--         \theta_3 = \\ -->
+<!--         \beta_1 = \\ -->
+<!--     \end{cases}        -->
+<!-- \end{equation} -->
+<!-- $$ -->
 
 Par aileurs, appliquer une transformation de type Box-Cox $B(x, \lambda) = \frac{x^\lambda -1}{\lambda}$ avec un $\lambda=-1$ a amélioré nos résultats. Ce modèle pourrait être challenger par une approche basé sur des techinique d'apprentissage automatique (par exemple en entrainant une forêt aléatoire sur des lags de la série) ou d'apprentissage profond (cf. réseaux de neuronnes LSTM). 
 
-# Annexe 1
+\newpage
+
+# Annexe 1 : Différenciation
 
 L'objectif de cette section est de rendre les résidus $(X_t)$ de la décomposition simple stationnaires.
 
@@ -369,10 +376,10 @@ plot(decomposition_stl)
 ```
 # Annexe 3
 
-Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ.
+Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de maximisation de la log-vraissemblance.
 
 ```{r, echo=FALSE}
-lamb = BoxCox.lambda(trainset, method = 'guerrero')
+lamb = BoxCox.lambda(trainset, method = 'loglik')
 bc_trainset = BoxCox(trainset, lambda=lamb)
 plot(bc_trainset)
 ```
@@ -421,7 +428,7 @@ layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(diff7_bc, lag=40, main="")
 pacf(diff7_bc, lag=40, main="")
 ```
-Le résultat est bien meilleur. Il y a un pics significatif au lag 7 sur l'ACF et aux lags 7 et 8 sur la PACF.
+Le résultat est bien meilleur. Il y a un pics significatif au lag 7 sur l'ACF et aux lags 1, 2, 7 et 8 sur la PACF.
 
 Filtre $(I-B)(I-B^7)$:
 
@@ -430,32 +437,22 @@ layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(ddiff7_bc, lag=40, main="")
 pacf(ddiff7_bc, lag=40, main="")
 ```
-Des pics significatif sont présent aux lags 1,7 et 8 sur l'ACF et aux lags 1, 2, 3, 6 et 7 sur la PACF.
+Des pics significatif sont présent aux lags 1,7 et 8 sur l'ACF et aux lags 1, 2, 3, 6, 7, 21 et 28 sur la PACF.
 
-En conclusion, il est judicieux de considérer les incréments correspondant aux différenciations $I-B^7$ et $(I-B)(I-B^7)$ dont la stationnarité est soutenue par l'analyse visuelle, les tests ADF et KPSS et les graphes ACF et PACF. On notera aussi que la tendance et la saisonnalité est éliminée sur ces séries.
+En conclusion, il est judicieux de considérer les incréments correspondant à la différenciations $I-B^7$ donnant les meilleurs résultats pour les tests ADF et KPSS ainsi que pour l'analyse les graphes ACF et PACF. On notera aussi que la tendance et la saisonnalité est éliminée sur cette séries.
 
-On utilise la fonction `auto.arima` pour déterminer les modèles SARIMA expliquant le mieux nos données.
-
-Un premier modèle avec $d=0$ et $D=1$ ressort :
+On utilise la fonction `auto.arima` pour déterminer le modèle SARIMA expliquant le mieux nos données.
 
 ```{r, echo=FALSE}
-auto.arima(trainset, allowmean=TRUE, D=1, d=0, allowdrift=TRUE, lambda=-1, biasadj=TRUE)
+auto.arima(trainset, d=0, D=1, max.P=1, max.Q=1, allowmean=TRUE, allowdrift=TRUE, lambda=-0.45, biasadj=TRUE)
 ```
-Les termes ar2, ar3 et ar4 ne sont pas significatifs, on va donc modifier un peu notre modèle.
+Tous les coefficients sont significatifs, on choisit de garder ce modèle.
 
-```{r, echo=FALSE}
-auto.arima(bc_trainset, allowmean=TRUE, max.p=1, max.q=1, d=0, D=1, allowdrift=TRUE)
+En suivant une procédure similaire, il est possible le construire un modèle avec la transformation logarithmique.
+
+```{r}
+auto.arima(trainset, d=0, D=1, max.P=1, max.Q=1, allowmean=TRUE, allowdrift=TRUE, lambda=0, biasadj=TRUE)
 ```
-Le coefficient sma1 n'est pas significatif, mais sma2 l'est, donc on garde ce modèle qui est meilleur que le précédent au sens du critère BIC. On dispose donc d'un premier modèle SARIMA$(1,0,1)(1,1,2)_7$.
-
-
-On peut ensuite déterminer un second modèle avec $d=1$ et $D=1$ :
-```{r, echo=FALSE}
-model4 = auto.arima(bc_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
-model4
-```
-Les coefficients ma2 et sma1 ne sont pas significatifs, mais ne nous ammènent pas à rétrograder notre modèle. On dispose donc d'un second modèle SARIMA$(0,1,3)(1,1,2)_7$.
-
 
 # Annexe 4 : xreg
 
@@ -473,3 +470,8 @@ auto.arima(trainset, xreg = cbind(t, t2))
 auto.arima(trainset, xreg = cbind(t))
 ```
 On conclue que les coefficients de régression ne sont pas significatifs pour les régressions d'ordre 1, 2 et 3. On ne retient donc pas cette option.
+
+```{r}
+warning()
+```
+
