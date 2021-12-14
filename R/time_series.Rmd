@@ -11,7 +11,6 @@ output:
 ---
 
 ```{r warning=FALSE, echo=FALSE, results='hide'}
-# library(TSA)
 library(tseries)
 library(forecast)
 source(file = "functions.R")
@@ -45,9 +44,7 @@ t3 = 247:287; X3 = trainset[t3]
 lm1 = lm(X1~t1)
 lm2 = lm(X2~t2)
 lm3 = lm(X3~t3)
-# print(summary(lm1))
-# print(summary(lm2))
-# print(summary(lm3))
+
 plot(t1, X1, type='l', xlab="Index", ylab="# commandes", main="Segmentation de la série temporelle", xlim=c(0,length(trainset)))
 lines(t2, X2, type="l", col="blue")
 lines(t3, X3, type="l", col="red")
@@ -68,7 +65,6 @@ Afin de valider cette hypothèse, il est possible d'appliquer la procédure suiv
 
 ```{r, fig.width=7, fig.height=5, echo=FALSE}
 decomposition = decompose(trainset)
-# plot(decomposition)
 
 decomp.plot2 <- function(x, main)
 {
@@ -80,8 +76,6 @@ decomp.plot2 <- function(x, main)
         random = x$random), main = main, xlab="Période")
 }
 decomp.plot2(decomposition, main="Décomposition additive de la série")
-# decomposition_stl = stl(trainset, s.window=7)
-# plot(decomposition_stl)
 ```
 Pour pouvoir construire un modèle de prédiction sur la base de ces résultats, nous allons appliquer une régression linéaire sur la tendance puis y ajouter la composante saisonnière.
 
@@ -248,15 +242,16 @@ check_res(res_model1, "Analyse de résidus : SARIMA(3,0,3)(0,1,1)[7]")
 ```
 Les résidus de ce modèle 1 semblent tout à fait correspondre à un bruit blanc. En effet, l'ACF et la PACF n'ont aucun pic hors du couloir de non-significativité, les tests ADF et KPSS estiment les résidus stationnaires et le test de Ljung-Box avec une p-value relativement élevée de 0.9628 ne rejette pas l'hypothèse d'indépendance. Néanmoins, leur distribution est légèrement trop concentrée pour coller parfaitement à une distribution normale, comme peut en témoigner la p-value du test de Shapiro.
 
-Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Annexe 3, notamment en appliquant des transformations de Box-Cox et logarithmique. L'annexe 4 contient les résultats (non probants) des modélisations exploitant le paramètre `xreg` de la fonction `auto.arima`. Les modèles retenus sont les suivants :
+Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Annexe 2 et 3, notamment en appliquant des transformations de Box-Cox et logarithmique. L'annexe 4 contient les résultats (non probants) des modélisations exploitant le paramètre `xreg` de la fonction `auto.arima`. Les modèles retenus sont les suivants :
 
 | Modèle                  | Transformation | BIC       |
 |-------------------------|----------------|-----------|
-| ARMA(4,0,4)             | Décompositon   | 1522.94   |
+| SARIMA(5,0,0)(0,1,1)[7] | Décompositon   |           |
 | SARIMA(3,0,3)(0,1,1)[7] | Aucune         | 1702.45   |
 | SARIMA(2,0,3)(0,1,1)[7] | Log            | -320.69   |
 | SARIMA(2,0,3)(0,1,1)[7] | Box-Cox        | -1185.07  |
 | Holt-Winters            | Aucune         | -1185.07  |
+| ETS                     | STL            |           |
 
 # Prédiction
 
@@ -264,19 +259,22 @@ Précédemment, la comparaison des modèles était basée sur des critères int�
 
 Il est temps de comparer nos modèles sur des critères prédictifs. La procédure d'évaluation consiste en une validation simple. Les scores utilisés pour comparer les modèles sont les métriques RMSE et MAPE (Mean Absolute Percentage Error).
 
-```{r, echo=FALSE, results='markup'}
+```{r, echo=FALSE, results='hide'}
 sarima = Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE)
 log_sarima = Arima(trainset, order=c(2,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE, lambda=0, biasadj=TRUE)
 bc_sarima = Arima(trainset, order=c(2,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE, lambda=-0.45, biasadj=TRUE)
-arma = Arima(trainset, order=c(4,0,4))
+arma = auto.arima(decomp_res)
+print(arma)
 holt_winters = HoltWinters(trainset, seasonal="additive")
+decomp_stl = stl(trainset, s.window=7)
 
-models = c(decomp_arma, sarima, log_sarima, bc_sarima, holt_winters)
+models = c(sarima, log_sarima, bc_sarima, arma, holt_winters, decomp_stl)
 models_name = c("SARIMA(3,0,3)(0,1,1)[7]",
                 "log + SARIMA(2,0,3)(0,1,1)[7]",
                 "BoxCox + SARIMA(2,0,3)(0,1,1)[7]",
-                "decomp + ARMA(3,0,3)",
+                "Décommp. simple + SARIMA(5,0,0)(0,1,1)[7]",
                 "Holt-Winters",
+                "Décomposition STL",
                 "testset")
 
 n2 = length(testset)
@@ -285,147 +283,97 @@ pred_log_sarima = forecast(log_sarima, h=n2, biasadj=TRUE, lambda = 0)
 pred_bc_sarima = forecast(bc_sarima, h=n2, biasadj=TRUE, lambda = -0.45)
 pred_decomp_arma = forecast(arma, h=n2)$mean + decomp(trainset, testset)$pred
 pred_hw = forecast(holt_winters, h=n2)
+pred_decomp_stl = forecast(decomposition_stl, h=n2)
 
-perf_sarima = cbind(type = models_name[1], getPerformance(as.vector(pred_arma$mean), as.vector(testset)))
+perf_sarima = cbind(type = models_name[1], getPerformance(as.vector(pred_sarima$mean), as.vector(testset)))
 perf_log_sarima = cbind(type = models_name[2], getPerformance(as.vector(pred_log_sarima$mean), as.vector(testset)))
 perf_bc_sarima = cbind(type = models_name[3], getPerformance(as.vector(pred_bc_sarima$mean), as.vector(testset)))
 perf_decomp_arma = cbind(type = models_name[4], getPerformance(as.vector(pred_decomp_arma), as.vector(testset)))
 perf_hw = cbind(type = models_name[5], getPerformance(as.vector(pred_hw$mean), as.vector(testset)))
+perf_decomp_stl =  cbind(type = models_name[6], getPerformance(as.vector(pred_decomp_stl$mean), as.vector(testset)))
 
-perf = rbind(perf_sarima, perf_log_sarima, perf_bc_sarima, perf_decomp_arma, perf_hw)
+perf = rbind(perf_sarima, perf_log_sarima, perf_bc_sarima, perf_decomp_arma, perf_hw, perf_decomp_stl)
 
 list(perf[order(perf$RMSE), ], models[order(perf$RMSE)])
 ```
-```{r, echo=FALSE}
-# plot(testset, xlab="Période", ylab="# commandes")
-# # lines(ts(pred_sarima$mean, frequency=7, start=c(41,1)), col="blue")
-# # lines(ts(pred_log_sarima$mean, frequency=7, start=c(41,1)), col="red")
-# lines(ts(pred_bc_sarima$mean, frequency=7, start=c(42,1)), col="red")
-# # lines(ts(pred_decomp_arma, frequency=7, start=c(41,1)), col="orange")
-# # lines(ts(pred_hw$mean, frequency=7, start=c(41,1)), col="brown")
-# legend("topleft", legend=c("Testset", "Prédictions"), col=c("black", "red"), lw=1)
-```
 
-```{r, echo=FALSE}
-help(MAPE)
-plot(pred_bc_sarima, xlim=c(38,45), main="BoxCox + SARIMA(2,0,3)(0,1,1)[7]", ylim=c(15,80))
+```{r, fig.width=13, fig.height=4, echo=FALSE}
+layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
+plot(pred_bc_sarima, main="BoxCox + SARIMA(2,0,3)(0,1,1)[7]")
+lines(testset)
+
+plot(pred_bc_sarima, xlim=c(38,45), main="BoxCox + SARIMA(2,0,3)(0,1,1)[7], zoom", ylim=c(15,80))
 lines(testset)
 legend("topleft", legend=c("RMSE = 7.923", "MAPE = 0,179%"))
 ```
 
-=> évolution de la RMSE
-
 # Conclusion
 
+Grâce aux conclusions des études de la série des parties 1 et 2 nous avons pu construire un modèle $ SARIMA(2,0,3)(0,1,1)_7$ ayant obtenu un score RMSE de 7,923 sur le jeu de données test. Soit une série temporelle $(X_t)$, l'écriture explicite de ce modèle est $(I-\phi_1B - \phi_2B^2)Y_t =(I+\theta_1B+\theta_2B^2+\theta_3B^3)(I+\beta_1B^7)\epsilon_t$ avec $Y_t = (I-B^7)X_t$. On réécrit cela sous la forme $Y_t = \phi_1Y_{t-1} + \phi_2Y_{t-2} + \epsilon_t + \theta_1\epsilon_{t-1} + \theta_2\epsilon_{t-2} + \theta_3\epsilon_{t-3} + \beta_1(\epsilon_{t-7} + \theta_1\epsilon_{t-8} + \theta_2\epsilon_{t-9} + \theta_3\epsilon_{t-10})$ avec $\left\{
+    \begin{array}{ll}
+        \phi_1 = \\
+        \theta_1 = \\
+        \theta_2 = \\
+        \theta_3 = \\
+        \beta_1 = \\
+    \end{array}
+\right$.
 
+Par aileurs, appliquer une transformation de type Box-Cox $B(x, \lambda) = \frac{x^\lambda -1}{\lambda}$ avec un $\lambda=-1$ a amélioré nos résultats. Ce modèle pourrait être challenger par une approche basé sur des techinique d'apprentissage automatique (par exemple en entrainant une forêt aléatoire sur des lags de la série) ou d'apprentissage profond (cf. réseaux de neuronnes LSTM). 
 
 # Annexe 1
 
-<!-- ```{r} -->
-<!-- model0 = auto.arima(decomp_residuals, allowmean=TRUE, allowdrift = TRUE) -->
-<!-- model0 -->
-<!-- ``` -->
-<!-- Tous les coefficient sont significatifs. -->
+L'objectif de cette section est de rendre les résidus $(X_t)$ de la décomposition simple stationnaires.
 
-<!-- ```{r} -->
-<!-- plot(decomp_residuals) -->
-<!-- lines(model0$fitted, col="red") -->
-<!-- ``` -->
+```{r, warning=FALSE, echo=FALSE}
+decomp_res = decompose(trainset)$random
+diff1_decomp_res = diff(decomp_res)
+check_res(diff1_decomp_res, "Différenciation avec (d,D)=(1,0)")
+```
+Analyse :
 
-<!-- ```{r} -->
-<!-- check_stat(model0$residuals) -->
-<!-- ``` -->
+La série $\Delta X_t = (I-B)X_t$ est stationnaire pour les tests ADF et KPSS mais on observe des pics significatifs aux lags 7, 14 et 21 sur l'ACF ainsi que des pics significatifs jusqu'aux lags 9 de la PACF. La distribustion semble suivre une loi normale.
 
-# Annexe 2
+```{r, warning=FALSE, echo=FALSE}
+diff7_decomp_res = diff(decomp_res, lag=7)
+check_res(diff7_decomp_res, "Différenciation avec (d,D)=(0,1)")
+```
+Analyse :
 
-<!-- ```{r} -->
-<!-- model1 = auto.arima(trainset, allowmean=TRUE, D=0, d = 1, allowdrift = TRUE) -->
-<!-- model1 -->
-<!-- ``` -->
-<!-- Tous les termes sont significatifs. On obtient un score BIC de 1796.31. -->
+L'ACF contient des pics significatifs aux lags 2, 3 et 7 et la PACF aux lags 2, 3, 5, 7, 9 et 10. La distribution ne semble pas normale car trop centré.
 
-<!-- ```{r} -->
-<!-- plot(trainset) -->
-<!-- lines(model1$fitted, col='red') -->
-<!-- ``` -->
-<!-- Visuellement, le modèle s'adapte relativement bien aux données. Analysons les résidus de ce premier modèle. -->
+```{r, warning=FALSE, echo=FALSE}
+ddiff7_decomp_res = diff(diff(decomp_res, lag=7))
+check_res(ddiff7_decomp_res, "ddiff7_decomp_res")
+```
+L'ACF contient des pics légèrement hors du couloir de significativité aux lags 1, 3, 4, 6 et 8 notamment. La PACF obtient des pics significatifs aux lags 1 à 5 et aux lags 9 et 9. La distribution ne semble pas normale car trop centré.
 
-<!-- ```{r} -->
-<!-- check_stat(model1$residuals) -->
-<!-- ``` -->
-<!-- #### Conclusion des tests -->
-<!-- Stat -->
-<!-- Box-Ljung : bb au risque de 5% -->
-<!-- KPSS : pas non-stationnaire -->
-<!-- ADF : stationnaire -->
-<!-- Plot : ras -->
-<!-- ACF : pas de pics significatifs -->
-<!-- PACF : pas de pics significatifs -->
-<!-- Lag 1 : indpt -->
+Malgrès ces résultats peu concluant, essayons d'appliquer un modèle sur ces résidus.
 
-<!-- Normalité -->
-<!-- Shapiro : pas gaussien -->
-<!-- Histogramme : pas gaussien -->
-<!-- Q-Q plot : pas gaussien -->
+```{r}
+auto.arima(decomp_res)
+```
 
-<!-- Passons en analyse du deuxième modèle. -->
+Tous les coefficients sont significatifs. Le fait d'obtenir $(d,D)=(0,1)$ est cohérant avec l'analyse car la différanciation saisonnière est la tranformation donnant les ACF et PACF les plus convaincantes.
 
-<!-- ```{r} -->
-<!-- model2 = auto.arima(trainset, D=1, d=1, allowmean=TRUE, allowdrift=TRUE) -->
-<!-- model2 -->
-<!-- ``` -->
-<!-- Tous les termes sauf sar1 sont significatifs, il serait donc judicieux de tester le modèle $SARIMA(2,1,3)\times(0,1,1)_7$. -->
+# Annexe 2 : décomposition STL
 
-<!-- ```{r} -->
-<!-- model2 = Arima(trainset, order=c(2,1,3), seasonal=list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE) -->
-<!-- model2 -->
-<!-- ``` -->
-<!-- Encore une fois, on a un terme non significatif (ar2), testons le modèle $SARIMA(1,1,3)\times(0,1,1)_7$. -->
+Une présentation de cette méthode est disponible au lien suivant : https://otexts.com/fpp2/stl.html.
 
-<!-- ```{r} -->
-<!-- model2 = Arima(trainset,order = c(1,1,3), seasonal = list(order=c(0,1,1), period=7), include.mean = TRUE, include.drift = TRUE) -->
-<!-- model2 -->
-<!-- ``` -->
-<!-- Cette troisième tentative semble meilleure du point de vue du BIC avec un score de 1726.91. -->
-
-<!-- ```{r} -->
-<!-- plot(trainset) -->
-<!-- lines(model2$fitted,col='red') -->
-<!-- ``` -->
-<!-- Le modèle s'applique relativement bien aux donnée. -->
-
-<!-- Analyse des résidus du modèle 2: -->
-
-<!-- ```{r} -->
-<!-- check_stat(model2$residuals) -->
-<!-- ``` -->
-<!-- #### Conclusion des tests -->
-<!-- Stationarité -->
-<!-- Box-Ljung : bb avec p-val=0.89 -->
-<!-- KPSS : stationnaire -->
-<!-- ADF : stationnaire -->
-<!-- Plot : pas de saisonalité, semble centrée -->
-<!-- ACF : 1 pic légèrement significatif en 10 (posssiblement un artefact) -->
-<!-- PACF : 1 pic légèrement significatif en 10 (posssiblement un artefact) -->
-<!-- Lag 1 : indpt -->
-
-<!-- Normalité -->
-<!-- Shapiro : pas gaussien -->
-<!-- Histogramme : pas gaussien -->
-<!-- Q-Q plot : pas gaussien -->
-
-<!-- On constate globalement que qu'il est possible d'obtenir des résidus bruit blanc. Cependant, ils ne semblent pas suivre une loi gaussienne. De plus, il possible que notre série soit légèrement hétéroscédastique. Des transformations telles que Box-Cox ou le passage au logarithme peuvent potentiellment atténuer voir corriger ce cela. -->
-
-
+```{r}
+decomposition_stl = stl(trainset, s.window=7)
+plot(decomposition_stl)
+```
 # Annexe 3
 
-Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ. 
+Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de Guerrero (1993), où le paramètre déterminé minimise les coefficients de variation $\frac{\sigma}{\mu}$ pour des séries extraites de la série de départ.
 
 ```{r, echo=FALSE}
 lamb = BoxCox.lambda(trainset, method = 'guerrero')
 bc_trainset = BoxCox(trainset, lambda=lamb)
 plot(bc_trainset)
 ```
+
 Une telle transformation n'est pas satisfaisante, on va tenter plusieurs différenciations jusqu'à ce que la série soit stationnaire.
 
 ## Différenciation I-B
@@ -447,7 +395,6 @@ pacf(as.numeric(BCTS1), lag.max=40)
 ```
 En effet, un motif périodique se dessine clairement. On voit néanmoins sur le graphe qu'on a réussi à réduire la tendance. Pour éliminer le motif périodique, essayons une différenciation d'ordre 7
 
-
 ## Différenciation I-B⁷
 
 ```{r, echo=FALSE}
@@ -463,7 +410,7 @@ adf.test(BCTS2)
 
 Tentons pour finir une différenciation $(I-B)(I-B^7)$
 
-### Differenciation (I-B)(I-B⁷)
+## Differenciation (I-B)(I-B⁷)
 
 ```{r, echo=FALSE}
 BCTS3 = diff(diff(bc_trainset,7))
@@ -476,6 +423,7 @@ Les tests KPSS et ADF ainsi que l'analyse visuelle vont dans le sens de la stati
 kpss.test(BCTS3)
 adf.test(BCTS3)
 ```
+
 En conclusion, il est judicieux de considérer les séries DLogTS2 et DLogTS correspondant aux différenciations $I-B^7$ et $(I-B)(I-B^7)$ dont la stationnarité est soutenue par l'analyse visuelle et les tests ADF et KPSS. On notera aussi qu'on a éliminé les tendances et les saisonnalités sur ces séries.
 
 ### Détermination des modèles
@@ -501,3 +449,21 @@ model4 = auto.arima(bc_trainset, D=1, d=1, allowdrift=TRUE, allowmean = TRUE)
 model4
 ```
 Les coefficients ma2 et sma1 ne sont pas significatifs, mais ne nous ammènent pas à rétrograder notre modèle. On dispose donc d'un second modèle SARIMA$(0,1,3)(1,1,2)_7$.
+
+
+# Annexe 4 : xreg
+
+Cette section a pour but de tester l'ajout d'une régression au sein d'un modèle $SARIMA$.
+
+```{r, echo=FALSE}
+t = 1:length(trainset)
+t2 = t**2
+t3 = t**3
+Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), xreg=cbind(t, t2, t3))
+Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), xreg=cbind(t, t2))
+Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), xreg=cbind(t))
+auto.arima(trainset, xreg = cbind(t, t2, t3))
+auto.arima(trainset, xreg = cbind(t, t2))
+auto.arima(trainset, xreg = cbind(t))
+```
+On conclue que les coefficients de régression ne sont pas significatifs pour les régressions d'ordre 1, 2 et 3. On ne retient donc pas cette option.

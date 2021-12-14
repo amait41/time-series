@@ -59,7 +59,7 @@ plot_checkup_res = function(Res, title){
   qqline(Res)
   
   # Nuage de points standardisé
-  plot(Res, col='blue', main="Résidus normalisés", ylab = '', xlab = '')
+  plot(Res / sd(Res), col='blue', main="Résidus normalisés", ylab = '', xlab = '')
   abline(a=1.96, b=0, col='red')
   abline(a=-1.96, b=0, col='red')
 }
@@ -88,7 +88,6 @@ evaluate = function(model, trainset){
 }
 
 getPerformance = function(y_pred, y_true) {
-  # Compute metrics with y_pred and y_true
   MAE = MAE(y_pred, y_true)
   MAPE = MAPE(y_pred, y_true)
   MSE = MSE(y_pred, y_true)
