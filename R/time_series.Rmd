@@ -33,9 +33,9 @@ plot(trainset, type='l', xlab="Période", ylab="# commades", main="")
 
 Cette série présente plusieurs caractéristiques remarquables.
 
-Il y a une forte saisonalité sur les jours de la semaine. En effet, le nombre de commandes croît du dimanche au vendredi puis décroît le samedi en moyenne.
+Il y a une forte saisonnalité sur les jours de la semaine. En effet, le nombre de commandes croît du dimanche au vendredi puis décroît le samedi en moyenne.
 
-La série semble composée de deux voir trois régimes. Un premier lors des 18 premières semaines avec une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis vient une période de 16 semaines avec tendance baissière, une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semblent reprendre le schéma des premières semaines avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
+La série semble composée de deux voire trois régimes. Un premier lors des 18 premières semaines avec une tendance haussière, une saisonnalité très marquée et une variance relativement grande. Puis vient une période de 16 semaines avec tendance baissière, une saisonnalité moins marquée et une plus faible variance. Enfin, les 5 dernières semaines semblent reprendre le schéma des premières semaines avec un tendance à la hausse, une saisonnalité marquée et une variance qui augmente.
 
 ```{r,  echo=FALSE, fig.width=15, fig.height=4, fig.cap="\\label{fig:figs}Analyse visuelle de la série"}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
@@ -109,7 +109,7 @@ plot(decomposition$random, ylab="", xlab="Période", main="Résidus de la décom
 ```
 Il semble y avoir une légère saisonnalité dans les résidus.
 
-En plus de l'aspect visuel, nous allons utiliser deux tests permettent d'évaluer l'hypothèse de stationarité.
+En plus de l'aspect visuel, nous allons utiliser deux tests permettant d'évaluer l'hypothèse de stationarité.
 ADF teste $\mathcal{H}_0$ : "la trajectoire est issue d'un processus non stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$. KPSS teste $\mathcal{H}_0$ : "la trajectoire est issue d'un processus stationnaire" contre $\mathcal{H}_1=\bar{\mathcal{H}_0}$.
 
 ```{r, results="hide", echo=FALSE, warning=FALSE, fig.cap="\\label{fig:figs}Résidus de la décomposition"}
@@ -134,15 +134,15 @@ layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(res_decomp, main="")
 pacf(res_decomp, main="")
 ```
-L'ACF présente des pics périodiques majoritairement significatifs avec une faible décroissance. On observe une corrélation élevée pour les lag multiple de 7. La PACF possède des corrélations partielles significatives aux lags 1 à 6. Ainsi, il est clair que nous encore avons une saisonalité d'ordre 7.
+L'ACF présente des pics périodiques majoritairement significatifs avec une faible décroissance. On observe une corrélation élevée pour les lag multiples de 7. La PACF possède des corrélations partielles significatives aux lags 1 à 6. Ainsi, il est clair que nous encore avons une saisonalité d'ordre 7.
 
-En conclusion, les résidus du modèle de decomposition ne sont pas stationnaires et présentent une saisonalité d'ordre 7.
+En conclusion, les résidus du modèle de decomposition ne sont pas stationnaires et présentent une saisonnalité d'ordre 7.
 
 # Différenciation
 
 Afin de rendre une série stationnaire, il est possible d'intégrer cette dernière en lui appliquant un filtre de la forme $(I-B)$.  On regarde alors si $\Delta X_t = (I-B)X_t$ est stationnaire.
 
-Cette méthode ne donne pas de résultats satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
+Cette méthode ne donne pas de résultat satisfaisant sur les résidus de la décomposition (cf. Annexe 1). Nous allons alors appliquer cette méthode sur la série originale.
 
 Les tests de stationnarité nous incitent à penser que la série différenciée $(\Delta X_t)$ n'est pas stationnaire.
 
@@ -157,7 +157,7 @@ kpss.test(diff1)
 | KPSS      | 0.06673     | >0.1      |
 Table: Stationnarité des incréments $\Delta X_t$
 
-Néanmoins, l'ACF et la PACF présentent repectivement des autocorrélations très significatives sur les lags 7, 14, 21, 28 et 1 à 7.
+Néanmoins, l'ACF et la PACF présentent des autocorrélations très significatives respectivement sur les lags 7, 14, 21, 28 et 1 à 7.
 
 ```{r, fig.width=12, fig.height=4, echo=FALSE}
 layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
@@ -261,7 +261,7 @@ Table: Comparaison des modèles
 
 Précédemment, la comparaison des modèles était basée sur des critères intégrant la notion de parcimonie avec le score BIC et l'étude des coefficients significatifs. Nous portions aussi une grande importance à ce que les résidus du modèle forment un bruit blanc gaussien.
 
-Il est temps de comparer nos modèles avec des critères prédictifs. La procédure d'évaluation consiste en une validation simple sur le jeu d'entrainement. Les scores utilisés pour comparer les modèles sont la RMSE et (Root Mean Square Error) la MAPE (Mean Absolute Percentage Error).
+Il est temps de comparer nos modèles avec des critères prédictifs. La procédure d'évaluation consiste en une validation simple sur le jeu d'entrainement. Les scores utilisés pour comparer les modèles sont la RMSE (Root Mean Square Error) et la MAPE (Mean Absolute Percentage Error).
 
 ```{r, echo=FALSE, results='hide'}
 sarima = Arima(trainset, order=c(3,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE)
@@ -322,7 +322,7 @@ On réécrit cela sous la forme :
 
 $Y_t = \phi_1Y_{t-1} + \phi_2Y_{t-2} + \epsilon_t + \theta_1\epsilon_{t-1} + \theta_2\epsilon_{t-2} + \theta_3\epsilon_{t-3} + \beta_1(\epsilon_{t-7} + \theta_1\epsilon_{t-8} + \theta_2\epsilon_{t-9} + \theta_3\epsilon_{t-10})$.
 
-Ce modèle pourrait être challengé par une approche basé sur des techiniques d'apprentissage automatique (par exemple en entrainant une forêt aléatoire sur les lags de la série) ou des méthodes d'apprentissage profond (cf. réseaux de neuronnes LSTM). 
+Ce modèle pourrait être challengé par une approche basée sur des techniques d'apprentissage automatique (par exemple en entrainant une forêt aléatoire sur les lags de la série) ou des méthodes d'apprentissage profond (cf. réseaux de neuronnes LSTM). 
 
 \newpage
 
@@ -342,7 +342,7 @@ check_res(diff1_decomp_res, "Différenciation avec (d,D)=(1,0)")
 
 Analyse :
 
-L'ACF contient des pics significatifs aux lags 2, 3 et 7 et la PACF aux lags 2, 3, 5, 7, 9 et 10. La distribution ne semble pas normale car trop centré.
+L'ACF contient des pics significatifs aux lags 2, 3 et 7 et la PACF aux lags 2, 3, 5, 7, 9 et 10. La distribution ne semble pas normale car trop centrée.
 
 ```{r, warning=FALSE, echo=FALSE}
 diff7_decomp_res = diff(decomp_res, lag=7)
@@ -356,13 +356,13 @@ ddiff7_decomp_res = diff(diff(decomp_res, lag=7))
 check_res(ddiff7_decomp_res, "ddiff7_decomp_res")
 ```
 
-Malgrès ces résultats peu concluant, essayons d'appliquer un modèle sur ces résidus.
+Malgré ces résultats peu concluant, essayons d'appliquer un modèle sur ces résidus.
 
 ```{r}
 auto.arima(decomp_res)
 ```
 
-Tous les coefficients sont significatifs. Le fait d'obtenir $(d,D)=(0,1)$ est cohérant avec l'analyse car la différanciation saisonnière est la tranformation donnant les ACF et PACF les plus convaincantes.
+Tous les coefficients sont significatifs. Le fait d'obtenir $(d,D)=(0,1)$ est cohérant avec l'analyse car la différenciation saisonnière est la tranformation donnant les ACF et PACF les plus convaincantes.
 
 
 # Annexe 2 : décomposition STL
@@ -437,9 +437,9 @@ layout(matrix(c(1, 2), nrow=1, ncol=2, byrow=TRUE))
 acf(ddiff7_bc, lag=40, main="")
 pacf(ddiff7_bc, lag=40, main="")
 ```
-Des pics significatif sont présent aux lags 1,7 et 8 sur l'ACF et aux lags 1, 2, 3, 6, 7, 21 et 28 sur la PACF.
+Des pics significatif sont présents aux lags 1,7 et 8 sur l'ACF et aux lags 1, 2, 3, 6, 7, 21 et 28 sur la PACF.
 
-En conclusion, il est judicieux de considérer les incréments correspondant à la différenciations $I-B^7$ donnant les meilleurs résultats pour les tests ADF et KPSS ainsi que pour l'analyse les graphes ACF et PACF. On notera aussi que la tendance et la saisonnalité est éliminée sur cette séries.
+En conclusion, il est judicieux de considérer les incréments correspondant à la différenciations $I-B^7$ donnant les meilleurs résultats pour les tests ADF et KPSS ainsi que pour l'analyse des ACF et PACF. On notera aussi que la tendance et la saisonnalité sont éliminées sur cette série.
 
 On utilise la fonction `auto.arima` pour déterminer le modèle SARIMA expliquant le mieux nos données.
 
@@ -469,7 +469,7 @@ auto.arima(trainset, xreg = cbind(t, t2, t3))
 auto.arima(trainset, xreg = cbind(t, t2))
 auto.arima(trainset, xreg = cbind(t))
 ```
-On conclue que les coefficients de régression ne sont pas significatifs pour les régressions d'ordre 1, 2 et 3. On ne retient donc pas cette option.
+On conclut que les coefficients de régression ne sont pas significatifs pour les régressions d'ordre 1, 2 et 3. On ne retient donc pas cette option.
 
 # Annexe 5 : `auto.arima`
 
