@@ -249,8 +249,8 @@ Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Anne
 |-------------------------|----------------|-----------|
 | SARIMA(5,0,0)(0,1,1)[7] | Décompositon   |           |
 | SARIMA(3,0,3)(0,1,1)[7] | Aucune         | 1702.45   |
-| SARIMA(2,0,3)(0,1,1)[7] | Log            | -320.69   |
-| SARIMA(2,0,3)(0,1,1)[7] | Box-Cox        | -1185.07  |
+| SARIMA(2,0,3)(0,1,1)[7] | Log            | -344.91   |
+| SARIMA(2,0,3)(0,1,1)[7] | Box-Cox        | -1250.18  |
 | Holt-Winters            | Aucune         | -1185.07  |
 | ETS                     | STL            |           |
 Table: Comparaison des modèles
@@ -326,7 +326,7 @@ Ce modèle pourrait être challengé par une approche basée sur des techniques 
 
 \newpage
 
-# Annexe 1 : différenciation
+# Annexe 1 : Différenciation
 
 L'objectif de cette section est de rendre les résidus $(X_t)$ de la décomposition simple stationnaires.
 
@@ -365,7 +365,7 @@ auto.arima(decomp_res)
 Tous les coefficients sont significatifs. Le fait d'obtenir $(d,D)=(0,1)$ est cohérant avec l'analyse car la différenciation saisonnière est la tranformation donnant les ACF et PACF les plus convaincantes.
 
 
-# Annexe 2 : décomposition STL
+# Annexe 2 : Décomposition STL
 
 Une présentation de cette méthode est disponible au lien suivant : https://otexts.com/fpp2/stl.html.
 
@@ -374,7 +374,7 @@ decomposition_stl = stl(trainset, s.window=7)
 plot(decomposition_stl)
 ```
 
-# Annexe 3 : tansformation de Box-Cox
+# Annexe 3 : Transformation Box-Cox
 
 Dans cette annexe, nous détaillons de façon succincte notre procédure de choix de modèles pour une transformation BoxCox des données. Nous utilisons la fonction `BoxCox.lambda` pour déterminer le meilleur paramètre de transformation BoxCox. Nous utilisons ici cette fonction avec la méthode de maximisation de la log-vraissemblance.
 
