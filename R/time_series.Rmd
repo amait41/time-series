@@ -1,11 +1,13 @@
 ---
-title: \vspace{3.5in}"Série Chronologique - Projet"
+title: "Série Chronologique - Projet"
 author: "M. Le Paumier, A. Maïtammar"
 date: "`r Sys.Date()`"
 output:
-   pdf_document:
-      fig_caption: true
-      number_sections: true
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  html_document:
+    df_print: paged
 ---
 
 \newpage
@@ -224,7 +226,7 @@ Pour estimer la pertinence du modèle et en particulier la significativité d'un
 model1 = auto.arima(trainset, d=0, D=1, max.P=0, include.mean=TRUE, allowdrift=TRUE)
 model1
 ```
-Les coefficients sont tous significatifs. Le score BIC obtenu pour ce modèle est meilleur que pour le modèle précédent avec 1708 contre 1717,88.
+Les coefficients sont tous significatifs. Le score BIC obtenu pour ce modèle est meilleur que pour le modèle précédent avec 1778.83 contre 1788.76.
 
 Pour considérer le modèle comme satifaisant, les résidus doivent former si possible un bruit blanc. Autrement dit, les résidus réduits doivent être stationnaires, centrés, indépendants et suivre une loi normale. Pour ce faire nous utilisons différents outils statistiques tels que les tests ADF et KPSS présentés précédemment ainsi que les tests de Ljung-Box d'hypothèse nulle $\mathcal{H_0}$ : "La série temporelle ne possède pas d'autocorrélation." ou de Shapiro d'hypothèse nulle $\mathcal{H_0}$ : "L'échantillon suit une loi normale."
 
@@ -248,7 +250,7 @@ Ce modèle est assez satisfaisant. D'autres modèles ont été évalués en Anne
 | Modèle                  | Transformation | BIC       |
 |-------------------------|----------------|-----------|
 | SARIMA(5,0,0)(0,1,1)[7] | Décompositon   |           |
-| SARIMA(3,0,3)(0,1,1)[7] | Aucune         | 1702.45   |
+| SARIMA(3,0,3)(0,1,1)[7] | Aucune         | 1778.83   |
 | SARIMA(2,0,3)(0,1,1)[7] | Log            | -344.91   |
 | SARIMA(2,0,3)(0,1,1)[7] | Box-Cox        | -1250.18  |
 | Holt-Winters            | Aucune         | -1185.07  |
@@ -269,15 +271,15 @@ log_sarima = Arima(trainset, order=c(2,0,3), seasonal=list(order=c(0,1,1), perio
 bc_sarima = Arima(trainset, order=c(2,0,3), seasonal=list(order=c(0,1,1), period=7), include.mean=TRUE, include.drift=FALSE, lambda=-0.45, biasadj=TRUE)
 arma = auto.arima(decomposition$random)
 holt_winters = HoltWinters(trainset, seasonal="additive")
-decomp_stl = stl(trainset, s.window=7)
+#decomp_stl = stl(trainset, s.window=7)
 
-models = c(sarima, log_sarima, bc_sarima, arma, holt_winters, decomp_stl)
+models = c(sarima, log_sarima, bc_sarima, arma, holt_winters)
 models_name = c("SARIMA(3,0,3)(0,1,1)[7]",
                 "log + SARIMA(2,0,3)(0,1,1)[7]",
                 "BoxCox + SARIMA(2,0,3)(0,1,1)[7]",
                 "Décommp. simple + SARIMA(5,0,0)(0,1,1)[7]",
                 "Holt-Winters",
-                "Décomposition STL",
+                #"Décomposition STL",
                 "testset")
 
 n2 = length(testset)
@@ -286,16 +288,17 @@ pred_log_sarima = forecast(log_sarima, h=n2, biasadj=TRUE, lambda = 0)
 pred_bc_sarima = forecast(bc_sarima, h=n2, biasadj=TRUE, lambda = -0.45)
 pred_decomp_arma = forecast(arma, h=n2)$mean + decomp(trainset, testset)$pred
 pred_hw = forecast(holt_winters, h=n2)
-pred_decomp_stl = forecast(stl(trainset, s.window=7), h=n2)
+#pred_decomp_stl = forecast(stl(trainset, s.window=7), h=n2)
 
 perf_sarima = cbind(type = models_name[1], getPerformance(as.vector(pred_sarima$mean), as.vector(testset)))
 perf_log_sarima = cbind(type = models_name[2], getPerformance(as.vector(pred_log_sarima$mean), as.vector(testset)))
 perf_bc_sarima = cbind(type = models_name[3], getPerformance(as.vector(pred_bc_sarima$mean), as.vector(testset)))
 perf_decomp_arma = cbind(type = models_name[4], getPerformance(as.vector(pred_decomp_arma), as.vector(testset)))
 perf_hw = cbind(type = models_name[5], getPerformance(as.vector(pred_hw$mean), as.vector(testset)))
-perf_decomp_stl =  cbind(type = models_name[6], getPerformance(as.vector(pred_decomp_stl$mean), as.vector(testset)))
+#perf_decomp_stl =  cbind(type = models_name[6], getPerformance(as.vector(pred_decomp_stl$mean), as.vector(testset)))
+perf_decomp_stl = c()
 
-perf = rbind(perf_sarima, perf_log_sarima, perf_bc_sarima, perf_decomp_arma, perf_hw, perf_decomp_stl)
+perf = rbind(perf_sarima, perf_log_sarima, perf_bc_sarima, perf_decomp_arma, perf_hw)
 
 list(perf[order(perf$RMSE), ], models[order(perf$RMSE)])
 ```
